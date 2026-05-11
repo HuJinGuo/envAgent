@@ -1,0 +1,40 @@
+server:
+  port: 18081
+
+spring:
+  application:
+    name: env-agent-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/env_agent_ai}
+    username: ${DB_USERNAME:openclaw}
+    password: ${DB_PASSWORD:openclaw}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:11}
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  swagger-ui:
+    path: /api/swagger-ui.html
+
+app:
+  openai:
+    base-url: ${OPENAI_BASE_URL:http://127.0.0.1:11434/v1}
+    api-key: ${OPENAI_API_KEY:demo-key}
+    chat-model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+    embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+  vector:
+    dimensions: ${VECTOR_DIMENSIONS:1536}
+    similarity-threshold: ${VECTOR_SIMILARITY_THRESHOLD:0.65}
+  jwt:
+    secret: ${JWT_SECRET:ZW52LWFnZW50LWJhY2tlbmQtc2VjcmV0LWZvci1kZXYtdGVzdC0xMjM0NTY3ODkw}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:28800}

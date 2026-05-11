@@ -1,0 +1,28 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: env-agent-backend-test
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/env_agent_ai
+    username: openclaw
+    password: openclaw
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 11
+
+app:
+  openai:
+    base-url: http://127.0.0.1:11434/v1
+    api-key: demo-key
+    chat-model: gpt-4o-mini
+    embedding-model: text-embedding-3-small
+  vector:
+    dimensions: 1536
+    similarity-threshold: 0.65
+  jwt:
+    secret: ZW52LWFnZW50LWJhY2tlbmQtc2VjcmV0LWZvci1kZXYtdGVzdC0xMjM0NTY3ODkw
+    expiration-seconds: 28800
