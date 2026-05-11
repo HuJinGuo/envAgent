@@ -9,8 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-query": "^5.100.10",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.14.0",
+    "msw": "^2.14.6",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -18,5 +27,10 @@
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.6.2",
     "vite": "^5.4.10"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

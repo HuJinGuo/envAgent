@@ -2,21 +2,19 @@ server:
   port: 18081
 
 spring:
-  profiles:
-    active: dev
   application:
     name: env-agent-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/env_agent_ai}
-    username: ${DB_USERNAME:openclaw}
-    password: ${DB_PASSWORD:openclaw}
+    url: jdbc:postgresql://101.133.238.173:5432/env_agent_ai
+    username: openclaw
+    password: openclaw
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      database: ${REDIS_DATABASE:11}
+      host: 101.133.238.173
+      port: 6379
+      password:
+      database: 11
   jackson:
     default-property-inclusion: non_null
 
@@ -30,9 +28,9 @@ springdoc:
 
 app:
   openai:
-    base-url: ${OPENAI_BASE_URL:http://127.0.0.1:11434/v1}
-    api-key: ${OPENAI_API_KEY:demo-key}
-    chat-model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+    base-url: http://101.133.238.173:8317/v1
+    api-key: sk-2BJiOasP3SP6qZjDC
+    chat-model: gpt-5.4
     embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
   vector:
     dimensions: ${VECTOR_DIMENSIONS:1536}

@@ -1,0 +1,540 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.root{width:100%;aspect-ratio:16/9;display:flex;background:var(--color-background-tertiary);font-family:var(--font-sans);overflow:hidden;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary)}
+.nav{width:52px;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:2px;flex-shrink:0}
+.logo{width:32px;height:32px;background:#185FA5;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.logo i{color:#fff;font-size:15px}
+.ni{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--color-text-tertiary);font-size:17px;transition:all .15s}
+.ni:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.ni.on{background:#E6F1FB;color:#185FA5}
+.nav-bot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:2px}
+.av-sm{width:26px;height:26px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#185FA5}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:44px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0}
+.tb-title{font-size:13px;font-weight:500;color:var(--color-text-primary);flex:1}
+.tb-role{font-size:11px;padding:2px 9px;border-radius:99px;background:#E6F1FB;color:#185FA5;font-weight:500}
+.tb-div{width:1px;height:14px;background:var(--color-border-tertiary)}
+.body{flex:1;display:flex;overflow:hidden}
+.page{display:none;flex:1;min-width:0;overflow:hidden}
+.page.on{display:flex}
+
+/* shared */
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:14px}
+.card-hd{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:6px 10px;font-size:10px;font-weight:500;color:var(--color-text-secondary);border-bottom:0.5px solid var(--color-border-tertiary)}
+.tbl td{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.bdg{display:inline-flex;align-items:center;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:500}
+.bdg-ok{background:#EAF3DE;color:#3B6D11}
+.bdg-warn{background:#FAECE7;color:#993C1D}
+.bdg-info{background:#E6F1FB;color:#185FA5}
+.bdg-proc{background:#FAEEDA;color:#854F0B}
+.bdg-gray{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.bdg-purple{background:#EEEDFE;color:#3C3489}
+.row-act{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-shrink:0}
+.search-inp{border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:6px 11px;font-size:12px;background:var(--color-background-primary);color:var(--color-text-primary);outline:none}
+.act-btn{padding:6px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);font-size:12px;cursor:pointer;color:var(--color-text-secondary);display:flex;align-items:center;gap:4px}
+.pri-btn{padding:6px 13px;background:#185FA5;color:#fff;border:none;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.tab-strip{display:flex;gap:1px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:3px;width:fit-content}
+.ts-item{padding:4px 11px;border-radius:6px;font-size:12px;cursor:pointer;color:var(--color-text-secondary);transition:.15s}
+.ts-item.on{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500;border:0.5px solid var(--color-border-tertiary)}
+.inner-page{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500}
+.av-b{background:#E6F1FB;color:#185FA5}
+.av-t{background:#E1F5EE;color:#0F6E56}
+.av-a{background:#FAEEDA;color:#854F0B}
+
+/* stat cards */
+.stat-grid{display:grid;gap:10px;flex-shrink:0}
+.stat-g4{grid-template-columns:repeat(4,1fr)}
+.stat-g3{grid-template-columns:repeat(3,1fr)}
+.sc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
+.sc-lbl{font-size:11px;color:var(--color-text-secondary);margin-bottom:5px}
+.sc-val{font-size:20px;font-weight:500;color:var(--color-text-primary)}
+.sc-sub{font-size:10px;color:var(--color-text-tertiary);margin-top:3px}
+.sc-warn{color:#A32D2D}
+.sc-ok{color:#3B6D11}
+.sc-blue{color:#185FA5}
+
+/* two/three col */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── DASHBOARD ── */
+.dash-body{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.bar-lbl{width:56px;color:var(--color-text-secondary);font-size:11px;flex-shrink:0}
+.bar-track{flex:1;height:5px;background:var(--color-background-tertiary);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px}
+.bar-val{width:28px;text-align:right;font-size:11px;color:var(--color-text-tertiary)}
+
+/* ── CHAT ── */
+.left-panel{width:196px;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;flex-shrink:0}
+.lp-top{padding:10px}
+.new-btn{width:100%;padding:7px 0;background:#185FA5;color:#fff;border:none;border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+.lp-section{font-size:10px;color:var(--color-text-tertiary);letter-spacing:.06em;padding:8px 12px 3px;text-transform:uppercase}
+.lp-list{flex:1;overflow-y:auto;padding:0 6px}
+.sess{padding:6px 8px;border-radius:6px;font-size:12px;color:var(--color-text-secondary);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess:hover{background:var(--color-background-secondary)}
+.sess.on{background:#E6F1FB;color:#185FA5}
+.lp-kb{padding:8px 12px;border-top:0.5px solid var(--color-border-tertiary);flex-shrink:0}
+.lp-kb-title{font-size:10px;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+.kb-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:11px;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);cursor:pointer;margin:2px 2px 0 0}
+.kb-chip.on{background:#E6F1FB;border-color:#85B7EB;color:#185FA5}
+.chat-area{flex:1;display:flex;flex-direction:column;min-width:0}
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.empty-icon{width:40px;height:40px;border-radius:12px;background:#E6F1FB;display:flex;align-items:center;justify-content:center;font-size:20px;color:#185FA5;margin-bottom:2px}
+.empty-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.empty-sub{font-size:12px;color:var(--color-text-secondary)}
+.suggestions{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px;max-width:500px}
+.sug{padding:7px 13px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-secondary);cursor:pointer;transition:.15s}
+.sug:hover{border-color:#378ADD;color:#185FA5;background:#E6F1FB}
+.chat-msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.msg-u{align-self:flex-end;background:#185FA5;color:#fff;padding:9px 13px;border-radius:12px 12px 3px 12px;font-size:12px;max-width:60%;line-height:1.6}
+.msg-a{align-self:flex-start;max-width:72%}
+.msg-a-inner{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);padding:11px 13px;border-radius:12px 12px 12px 3px;font-size:12px;line-height:1.7;color:var(--color-text-primary)}
+.cite{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;background:#E6F1FB;color:#185FA5;margin-left:3px;cursor:pointer}
+.sources{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.src{font-size:10px;padding:2px 7px;border-radius:5px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);color:var(--color-text-secondary)}
+.input-zone{padding:10px 16px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);flex-shrink:0}
+.input-row{display:flex;gap:7px;align-items:flex-end}
+.input-wrap{flex:1;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);overflow:hidden;transition:.15s}
+.input-wrap:focus-within{border-color:#378ADD}
+.input-wrap textarea{width:100%;border:none;outline:none;padding:8px 12px;font-size:12px;resize:none;background:transparent;color:var(--color-text-primary);height:46px;line-height:1.5}
+.input-actions{display:flex;align-items:center;padding:5px 9px;gap:5px;border-top:0.5px solid var(--color-border-tertiary)}
+.ia-btn{padding:3px 9px;border:0.5px solid var(--color-border-secondary);border-radius:5px;background:transparent;font-size:11px;color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;gap:3px}
+.ia-spacer{flex:1}
+.ia-hint{font-size:10px;color:var(--color-text-tertiary)}
+.send-btn{width:38px;height:38px;background:#185FA5;border:none;border-radius:var(--border-radius-md);cursor:pointer;color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;align-self:flex-end}
+.right-panel{width:210px;background:var(--color-background-primary);border-left:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;flex-shrink:0}
+.rp-header{padding:11px 13px;border-bottom:0.5px solid var(--color-border-tertiary);font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.rp-body{flex:1;overflow-y:auto;padding:9px 11px}
+.rp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:5px;color:var(--color-text-tertiary);font-size:12px}
+.ref-item{padding:9px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);margin-bottom:7px;cursor:pointer;transition:.15s}
+.ref-item:hover{border-color:#378ADD}
+.ref-title{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px;display:flex;align-items:center;gap:5px}
+.ref-excerpt{font-size:10px;color:var(--color-text-secondary);line-height:1.5}
+.ref-meta{font-size:10px;color:var(--color-text-tertiary);margin-top:5px}
+.sim-bar{display:flex;align-items:center;gap:5px;margin-top:3px}
+.sim-track{flex:1;height:3px;background:var(--color-background-tertiary);border-radius:99px;overflow:hidden}
+.sim-fill{height:100%;background:#185FA5;border-radius:99px}
+.sim-val{font-size:10px;color:var(--color-text-tertiary)}
+
+/* ── AGENT ── */
+.agent-layout{flex:1;display:flex;gap:12px;overflow:hidden;padding:16px}
+.agent-left{width:220px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+.agent-main{flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.agent-right{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
+.step-item{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.step-item:last-child{border-bottom:none}
+.step-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
+.sd-ok{background:#EAF3DE;color:#3B6D11}
+.sd-run{background:#FAEEDA;color:#854F0B}
+.sd-wait{background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.step-name{font-size:12px;font-weight:500;color:var(--color-text-primary)}
+.step-desc{font-size:11px;color:var(--color-text-secondary);margin-top:2px;line-height:1.4}
+.flow-bar{display:flex;align-items:center;gap:0;margin-bottom:2px}
+.fb-step{flex:1;text-align:center;padding:7px 4px;position:relative}
+.fb-step::after{content:'→';position:absolute;right:-6px;top:50%;transform:translateY(-50%);color:var(--color-text-tertiary);font-size:11px}
+.fb-step:last-child::after{display:none}
+.fb-icon{width:26px;height:26px;border-radius:7px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.fb-lbl{font-size:10px;color:var(--color-text-secondary)}
+.log-area{font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);line-height:2;padding:2px 0}
+.log-ok{color:#3B6D11}
+.log-run{color:#BA7517}
+.log-name{color:var(--color-text-primary);font-weight:500}
+
+/* ── MONITOR ── */
+.monitor-body{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:36px;padding:0 2px}
+.bar-c{border-radius:2px 2px 0 0;background:#B5D4F4;transition:.15s;min-width:6px}
+.bar-c.hi{background:#185FA5}
+.prog-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.prog-lbl{font-size:11px;color:var(--color-text-secondary);width:80px;flex-shrink:0}
+.prog-track{flex:1;height:5px;background:var(--color-background-tertiary);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;background:#185FA5}
+.prog-val{font-size:11px;color:var(--color-text-tertiary);width:32px;text-align:right}
+</style>
+
+<h2 class="sr-only">环境监管 AI 助手完整平台原型，含仪表盘、智能问答、知识库、污染源档案、Agent任务、系统监控、用户管理共七个页面</h2>
+
+<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+  <button class="ts-item on" onclick="go('dash',this)"><i class="ti ti-layout-dashboard" aria-hidden="true"></i> 仪表盘</button>
+  <button class="ts-item" onclick="go('chat',this)"><i class="ti ti-message-chatbot" aria-hidden="true"></i> 智能问答</button>
+  <button class="ts-item" onclick="go('kb',this)"><i class="ti ti-database" aria-hidden="true"></i> 知识库</button>
+  <button class="ts-item" onclick="go('source',this)"><i class="ti ti-building-factory-2" aria-hidden="true"></i> 污染源档案</button>
+  <button class="ts-item" onclick="go('agent',this)"><i class="ti ti-robot" aria-hidden="true"></i> Agent 任务</button>
+  <button class="ts-item" onclick="go('monitor',this)"><i class="ti ti-chart-bar" aria-hidden="true"></i> 系统监控</button>
+  <button class="ts-item" onclick="go('users',this)"><i class="ti ti-users" aria-hidden="true"></i> 用户管理</button>
+</div>
+
+<div class="root">
+  <div class="nav">
+    <div class="logo"><i class="ti ti-leaf" aria-hidden="true"></i></div>
+    <div class="ni on" id="ni-dash" onclick="go('dash',null,this)" aria-label="仪表盘"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></div>
+    <div class="ni" id="ni-chat" onclick="go('chat',null,this)" aria-label="智能问答"><i class="ti ti-message-chatbot" aria-hidden="true"></i></div>
+    <div class="ni" id="ni-kb" onclick="go('kb',null,this)" aria-label="知识库"><i class="ti ti-database" aria-hidden="true"></i></div>
+    <div class="ni" id="ni-source" onclick="go('source',null,this)" aria-label="污染源档案"><i class="ti ti-building-factory-2" aria-hidden="true"></i></div>
+    <div class="ni" id="ni-agent" onclick="go('agent',null,this)" aria-label="Agent任务"><i class="ti ti-robot" aria-hidden="true"></i></div>
+    <div class="ni" id="ni-monitor" onclick="go('monitor',null,this)" aria-label="系统监控"><i class="ti ti-chart-bar" aria-hidden="true"></i></div>
+    <div class="nav-bot">
+      <div class="ni" id="ni-users" onclick="go('users',null,this)" aria-label="用户管理"><i class="ti ti-users" aria-hidden="true"></i></div>
+      <div class="ni" aria-label="设置"><i class="ti ti-settings" aria-hidden="true"></i></div>
+      <div class="av-sm">张</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <span class="tb-title" id="tb-title">工作台概览</span>
+      <span class="tb-role">监测分析员</span>
+      <div class="tb-div"></div>
+      <div class="av-sm">张</div>
+    </div>
+    <div class="body">
+
+      <!-- 仪表盘 -->
+      <div id="p-dash" class="page on">
+        <div class="dash-body">
+          <div class="stat-grid stat-g4">
+            <div class="sc"><div class="sc-lbl">今日 AI 问答</div><div class="sc-val sc-blue">38</div><div class="sc-sub sc-ok">满意率 94%</div></div>
+            <div class="sc"><div class="sc-lbl">知识库文档</div><div class="sc-val">213</div><div class="sc-sub">本周新增 12 份</div></div>
+            <div class="sc"><div class="sc-lbl">Agent 任务</div><div class="sc-val">6</div><div class="sc-sub sc-ok">3 已完成 · 3 进行中</div></div>
+            <div class="sc"><div class="sc-lbl">今日 Token 费用</div><div class="sc-val">¥0.82</div><div class="sc-sub">本月累计 ¥24.6</div></div>
+          </div>
+          <div class="g3" style="flex:1;overflow:hidden">
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">最近问答记录</div>
+              <table class="tbl">
+                <tr><th>问题摘要</th><th>用户</th><th>时间</th></tr>
+                <tr><td>鑫达化工 COD 近 30 天趋势</td><td style="color:var(--color-text-secondary)">张析</td><td style="color:var(--color-text-tertiary)">10 分钟前</td></tr>
+                <tr><td>GB16297 无组织排放标准</td><td style="color:var(--color-text-secondary)">王检</td><td style="color:var(--color-text-tertiary)">32 分钟前</td></tr>
+                <tr><td>生成上月废水监测报告</td><td style="color:var(--color-text-secondary)">张析</td><td style="color:var(--color-text-tertiary)">1 小时前</td></tr>
+                <tr><td>氨氮超标原因分析</td><td style="color:var(--color-text-secondary)">陈局</td><td style="color:var(--color-text-tertiary)">2 小时前</td></tr>
+                <tr><td>许可证有效期查询</td><td style="color:var(--color-text-secondary)">李工</td><td style="color:var(--color-text-tertiary)">3 小时前</td></tr>
+              </table>
+            </div>
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">知识库使用分布</div>
+              <div style="flex:1;padding-top:4px">
+                <div class="bar-row"><span class="bar-lbl">环保法规</span><div class="bar-track"><div class="bar-fill" style="width:78%;background:#378ADD"></div></div><span class="bar-val">78%</span></div>
+                <div class="bar-row"><span class="bar-lbl">排放标准</span><div class="bar-track"><div class="bar-fill" style="width:65%;background:#7F77DD"></div></div><span class="bar-val">65%</span></div>
+                <div class="bar-row"><span class="bar-lbl">内部文件</span><div class="bar-track"><div class="bar-fill" style="width:42%;background:#1D9E75"></div></div><span class="bar-val">42%</span></div>
+              </div>
+              <div style="margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px">
+                <div class="card-hd" style="margin-bottom:8px">快捷入口</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <div onclick="go('chat')" style="padding:6px 11px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--color-text-secondary)" onmouseover="this.style.background='var(--color-background-secondary)'" onmouseout="this.style.background=''"><i class="ti ti-message-chatbot" style="color:#185FA5" aria-hidden="true"></i>AI 问答</div>
+                  <div onclick="go('kb')" style="padding:6px 11px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--color-text-secondary)" onmouseover="this.style.background='var(--color-background-secondary)'" onmouseout="this.style.background=''"><i class="ti ti-database" style="color:#0F6E56" aria-hidden="true"></i>知识库</div>
+                  <div onclick="go('agent')" style="padding:6px 11px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--color-text-secondary)" onmouseover="this.style.background='var(--color-background-secondary)'" onmouseout="this.style.background=''"><i class="ti ti-robot" style="color:#854F0B" aria-hidden="true"></i>Agent</div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">Agent 任务状态</div>
+              <table class="tbl">
+                <tr><th>任务名称</th><th>类型</th><th>状态</th></tr>
+                <tr><td style="font-size:11px">鑫达化工合规检查报告</td><td><span class="bdg bdg-info" style="font-size:10px">合规</span></td><td><span class="bdg bdg-ok">完成</span></td></tr>
+                <tr><td style="font-size:11px">上月废水监测汇总</td><td><span class="bdg bdg-purple" style="font-size:10px">报告</span></td><td><span class="bdg bdg-proc">进行中</span></td></tr>
+                <tr><td style="font-size:11px">华能热电 SO₂ 分析</td><td><span class="bdg bdg-info" style="font-size:10px">分析</span></td><td><span class="bdg bdg-proc">进行中</span></td></tr>
+                <tr><td style="font-size:11px">GB16297 适用性核查</td><td><span class="bdg bdg-gray" style="font-size:10px">查询</span></td><td><span class="bdg bdg-ok">完成</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 智能问答 -->
+      <div id="p-chat" class="page">
+        <div class="left-panel">
+          <div class="lp-top"><button class="new-btn"><i class="ti ti-plus" aria-hidden="true"></i> 新建对话</button></div>
+          <div class="lp-section">今天</div>
+          <div class="lp-list">
+            <div class="sess on">鑫达化工 COD 超标分析</div>
+            <div class="sess">GB16297 无组织排放查询</div>
+            <div class="sess">生成上月废水报告</div>
+            <div class="lp-section" style="padding-left:8px">昨天</div>
+            <div class="sess">氨氮超标原因分析</div>
+            <div class="sess">许可证有效期查询</div>
+            <div class="sess">SO₂ 排放标准对比</div>
+            <div class="lp-section" style="padding-left:8px">更早</div>
+            <div class="sess">废气监测数据解读</div>
+          </div>
+          <div class="lp-kb">
+            <div class="lp-kb-title">知识库范围</div>
+            <div><span class="kb-chip on">环保法规</span><span class="kb-chip on">排放标准</span><span class="kb-chip">内部文件</span></div>
+          </div>
+        </div>
+        <div class="chat-area" id="ca-empty">
+          <div class="empty-state">
+            <div class="empty-icon"><i class="ti ti-message-chatbot" aria-hidden="true"></i></div>
+            <div class="empty-title">环境监管 AI 助手</div>
+            <div class="empty-sub">可查询法规标准、解读监测数据、生成执法报告</div>
+            <div class="suggestions">
+              <div class="sug" onclick="showChat()">某企业废水 COD 近 30 天超标了吗？</div>
+              <div class="sug" onclick="showChat()">GB 8978 中化工行业 COD 限值是多少？</div>
+              <div class="sug" onclick="showChat()">帮我生成一份废水超标情况说明</div>
+              <div class="sug" onclick="showChat()">解读这批大气监测数据说明什么问题</div>
+              <div class="sug" onclick="showChat()">NOₓ 超标应启动哪些执法程序？</div>
+              <div class="sug" onclick="showChat()">查询鑫达化工的排污许可证信息</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-area" id="ca-msgs" style="display:none">
+          <div class="chat-msgs">
+            <div class="msg-u">鑫达化工废水排口近 30 天 COD 数据，帮我分析超标情况并说明适用标准</div>
+            <div class="msg-a">
+              <div class="msg-a-inner">根据调取的监测数据和知识库法规，以下是分析结果：<br><br><strong>超标情况：</strong>近 30 天共监测 28 次，其中 6 次超标（超标率 21.4%），最高值 186 mg/L，出现于 5 月 8 日。<br><br><strong>适用标准：</strong>鑫达化工属于化工行业，执行 GB 8978-1996《污水综合排放标准》，二级限值 COD ≤ 150 mg/L。<span class="cite">📄 GB 8978</span><br><br><strong>建议：</strong>存在多次超二级标准情况，建议启动现场核查程序，并要求企业限期整改。</div>
+              <div class="sources"><span class="src">📄 GB 8978-1996 第 4.1 条</span><span class="src">📊 在线监控数据工具</span><span class="src">📄 排污许可证工具</span></div>
+            </div>
+          </div>
+          <div class="input-zone">
+            <div class="input-row">
+              <div class="input-wrap">
+                <textarea placeholder="输入问题，可查询法规、解读监测数据、生成报告…"></textarea>
+                <div class="input-actions"><button class="ia-btn"><i class="ti ti-paperclip" aria-hidden="true"></i> 附件</button><button class="ia-btn"><i class="ti ti-report" aria-hidden="true"></i> 生成报告</button><div class="ia-spacer"></div><span class="ia-hint">Shift+Enter 换行 · Enter 发送</span></div>
+              </div>
+              <button class="send-btn" aria-label="发送"><i class="ti ti-send" aria-hidden="true"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="right-panel" id="rp-empty">
+          <div class="rp-header">引用来源</div>
+          <div class="rp-body"><div class="rp-empty"><i class="ti ti-file-search" style="font-size:20px" aria-hidden="true"></i><span>回答后展示引用来源</span></div></div>
+        </div>
+        <div class="right-panel" id="rp-refs" style="display:none;flex-direction:column">
+          <div class="rp-header">引用来源 · 3 处</div>
+          <div class="rp-body">
+            <div class="ref-item"><div class="ref-title"><i class="ti ti-file-type-pdf" style="font-size:12px;color:#993C1D" aria-hidden="true"></i>GB 8978-1996</div><div class="ref-excerpt">第四条：化工行业废水 COD 二级限值 150 mg/L…</div><div class="ref-meta">污水综合排放标准 · 第 4 页</div><div class="sim-bar"><div class="sim-track"><div class="sim-fill" style="width:94%"></div></div><span class="sim-val">94%</span></div></div>
+            <div class="ref-item"><div class="ref-title"><i class="ti ti-database" style="font-size:12px;color:#185FA5" aria-hidden="true"></i>在线监控数据</div><div class="ref-excerpt">鑫达化工 DW001 排口 2025-04~05 月监测记录…</div><div class="ref-meta">工具返回数据 · 实时</div><div class="sim-bar"><div class="sim-track"><div class="sim-fill" style="width:88%"></div></div><span class="sim-val">88%</span></div></div>
+            <div class="ref-item"><div class="ref-title"><i class="ti ti-file-description" style="font-size:12px;color:#0F6E56" aria-hidden="true"></i>排污许可证</div><div class="ref-excerpt">鑫达化工许可排放 COD ≤ 150 mg/L，有效期至 2026…</div><div class="ref-meta">工具返回数据 · 实时</div><div class="sim-bar"><div class="sim-track"><div class="sim-fill" style="width:81%"></div></div><span class="sim-val">81%</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 知识库 -->
+      <div id="p-kb" class="page">
+        <div class="inner-page">
+          <div class="row-act">
+            <div class="tab-strip"><div class="ts-item on">全部</div><div class="ts-item">环保法规</div><div class="ts-item">排放标准</div><div class="ts-item">内部文件</div></div>
+            <input class="search-inp" placeholder="搜索文档名称…" style="width:220px">
+            <div style="flex:1"></div>
+            <button class="pri-btn"><i class="ti ti-upload" aria-hidden="true"></i> 上传文档</button>
+          </div>
+          <div style="border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:18px;text-align:center;cursor:pointer;flex-shrink:0" onmouseover="this.style.background='#E6F1FB'" onmouseout="this.style.background=''">
+            <div style="font-size:20px;color:var(--color-text-tertiary);margin-bottom:5px"><i class="ti ti-cloud-upload" aria-hidden="true"></i></div>
+            <div style="font-size:12px;color:var(--color-text-secondary)">拖拽文件到此处上传，或点击选择文件</div>
+            <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:3px">支持 PDF / Word / TXT · 单文件最大 50MB</div>
+          </div>
+          <div class="card" style="flex:1;overflow:hidden">
+            <table class="tbl">
+              <tr><th style="width:38%">文档名称</th><th>分类</th><th>大小</th><th>切片数</th><th>上传时间</th><th>状态</th><th></th></tr>
+              <tr><td><i class="ti ti-file-type-pdf" style="color:#993C1D;margin-right:5px;font-size:12px" aria-hidden="true"></i>GB 8978-1996 污水综合排放标准.pdf</td><td><span class="bdg bdg-info">排放标准</span></td><td style="color:var(--color-text-secondary)">1.2 MB</td><td style="color:var(--color-text-secondary)">164</td><td style="color:var(--color-text-tertiary)">2025-04-10</td><td><span class="bdg bdg-ok">已就绪</span></td><td><i class="ti ti-dots-vertical" style="font-size:13px;cursor:pointer;color:var(--color-text-tertiary)" aria-label="更多操作"></i></td></tr>
+              <tr><td><i class="ti ti-file-type-pdf" style="color:#993C1D;margin-right:5px;font-size:12px" aria-hidden="true"></i>GB 3095-2012 环境空气质量标准.pdf</td><td><span class="bdg bdg-info">排放标准</span></td><td style="color:var(--color-text-secondary)">840 KB</td><td style="color:var(--color-text-secondary)">98</td><td style="color:var(--color-text-tertiary)">2025-04-08</td><td><span class="bdg bdg-ok">已就绪</span></td><td><i class="ti ti-dots-vertical" style="font-size:13px;cursor:pointer;color:var(--color-text-tertiary)" aria-label="更多操作"></i></td></tr>
+              <tr><td><i class="ti ti-file-type-doc" style="color:#185FA5;margin-right:5px;font-size:12px" aria-hidden="true"></i>2025年重点企业监管工作方案.docx</td><td><span class="bdg bdg-gray">内部文件</span></td><td style="color:var(--color-text-secondary)">320 KB</td><td style="color:var(--color-text-secondary)">—</td><td style="color:var(--color-text-tertiary)">今天 14:22</td><td><span class="bdg bdg-proc">解析中</span></td><td><i class="ti ti-dots-vertical" style="font-size:13px;cursor:pointer;color:var(--color-text-tertiary)" aria-label="更多操作"></i></td></tr>
+              <tr><td><i class="ti ti-file-type-pdf" style="color:#993C1D;margin-right:5px;font-size:12px" aria-hidden="true"></i>HJ 2.2-2018 大气环境评价导则.pdf</td><td><span class="bdg bdg-info">环保法规</span></td><td style="color:var(--color-text-secondary)">2.1 MB</td><td style="color:var(--color-text-secondary)">241</td><td style="color:var(--color-text-tertiary)">2025-03-28</td><td><span class="bdg bdg-ok">已就绪</span></td><td><i class="ti ti-dots-vertical" style="font-size:13px;cursor:pointer;color:var(--color-text-tertiary)" aria-label="更多操作"></i></td></tr>
+              <tr><td><i class="ti ti-file-type-pdf" style="color:#993C1D;margin-right:5px;font-size:12px" aria-hidden="true"></i>GB 16297-1996 大气污染物综合排放标准.pdf</td><td><span class="bdg bdg-info">排放标准</span></td><td style="color:var(--color-text-secondary)">1.8 MB</td><td style="color:var(--color-text-secondary)">203</td><td style="color:var(--color-text-tertiary)">2025-03-15</td><td><span class="bdg bdg-ok">已就绪</span></td><td><i class="ti ti-dots-vertical" style="font-size:13px;cursor:pointer;color:var(--color-text-tertiary)" aria-label="更多操作"></i></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 污染源档案 -->
+      <div id="p-source" class="page">
+        <div class="inner-page">
+          <div class="row-act">
+            <input class="search-inp" placeholder="搜索企业名称、信用代码、行业…" style="width:260px">
+            <button class="act-btn"><i class="ti ti-filter" aria-hidden="true"></i> 行业</button>
+            <button class="act-btn"><i class="ti ti-map-pin" aria-hidden="true"></i> 行政区划</button>
+            <button class="act-btn"><i class="ti ti-alert-triangle" aria-hidden="true"></i> 监管等级</button>
+            <div style="flex:1"></div>
+            <span style="font-size:11px;color:var(--color-text-tertiary)">数据来源：全国排污许可证管理平台（工具接入）</span>
+          </div>
+          <div class="card" style="flex:1;overflow:hidden">
+            <table class="tbl">
+              <tr><th>企业名称</th><th>行业类别</th><th>许可证编号</th><th>废水排口</th><th>废气排口</th><th>监管等级</th><th>许可证状态</th><th>最新监测</th></tr>
+              <tr><td style="font-weight:500;color:#185FA5;cursor:pointer">鑫达化工有限公司</td><td style="color:var(--color-text-secondary)">化学原料制造</td><td style="color:var(--color-text-secondary);font-size:11px">91330100...2024</td><td style="color:var(--color-text-secondary)">2 个</td><td style="color:var(--color-text-secondary)">3 个</td><td><span class="bdg bdg-warn">重点</span></td><td><span class="bdg bdg-ok">有效</span></td><td><span class="bdg bdg-warn">超标</span></td></tr>
+              <tr><td style="font-weight:500;color:#185FA5;cursor:pointer">华能热电厂</td><td style="color:var(--color-text-secondary)">电力热力生产</td><td style="color:var(--color-text-secondary);font-size:11px">91330100...2023</td><td style="color:var(--color-text-secondary)">—</td><td style="color:var(--color-text-secondary)">4 个</td><td><span class="bdg bdg-warn">重点</span></td><td><span class="bdg bdg-ok">有效</span></td><td><span class="bdg bdg-warn">超标</span></td></tr>
+              <tr><td style="font-weight:500;color:#185FA5;cursor:pointer">绿源食品加工厂</td><td style="color:var(--color-text-secondary)">农副食品加工</td><td style="color:var(--color-text-secondary);font-size:11px">91330100...2024</td><td style="color:var(--color-text-secondary)">1 个</td><td style="color:var(--color-text-secondary)">1 个</td><td><span class="bdg bdg-info">一般</span></td><td><span class="bdg bdg-ok">有效</span></td><td><span class="bdg bdg-ok">正常</span></td></tr>
+              <tr><td style="font-weight:500;color:#185FA5;cursor:pointer">宏达金属制品有限公司</td><td style="color:var(--color-text-secondary)">金属制品业</td><td style="color:var(--color-text-secondary);font-size:11px">91330100...2022</td><td style="color:var(--color-text-secondary)">1 个</td><td style="color:var(--color-text-secondary)">2 个</td><td><span class="bdg bdg-info">一般</span></td><td><span class="bdg bdg-proc">即将到期</span></td><td><span class="bdg bdg-warn">超标</span></td></tr>
+              <tr><td style="font-weight:500;color:#185FA5;cursor:pointer">东方纺织印染厂</td><td style="color:var(--color-text-secondary)">纺织业</td><td style="color:var(--color-text-secondary);font-size:11px">91330100...2023</td><td style="color:var(--color-text-secondary)">3 个</td><td style="color:var(--color-text-secondary)">2 个</td><td><span class="bdg bdg-warn">重点</span></td><td><span class="bdg bdg-ok">有效</span></td><td><span class="bdg bdg-ok">正常</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent 任务 -->
+      <div id="p-agent" class="page">
+        <div class="agent-layout">
+          <div class="agent-left">
+            <div class="card" style="flex-shrink:0">
+              <div class="card-hd">新建任务</div>
+              <textarea style="width:100%;height:64px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px;font-size:12px;resize:none;outline:none;background:var(--color-background-primary);color:var(--color-text-primary)" placeholder="描述任务，例如：生成鑫达化工本月废水超标情况说明…"></textarea>
+              <button class="pri-btn" style="width:100%;justify-content:center;margin-top:8px"><i class="ti ti-player-play" aria-hidden="true"></i> 执行任务</button>
+            </div>
+            <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+              <div class="card-hd">任务历史</div>
+              <table class="tbl">
+                <tr><th>任务</th><th>状态</th></tr>
+                <tr><td style="font-size:11px">鑫达化工合规检查</td><td><span class="bdg bdg-ok">完成</span></td></tr>
+                <tr><td style="font-size:11px">上月废水汇总报告</td><td><span class="bdg bdg-proc">进行中</span></td></tr>
+                <tr><td style="font-size:11px">华能 SO₂ 超标分析</td><td><span class="bdg bdg-proc">进行中</span></td></tr>
+                <tr><td style="font-size:11px">GB16297 适用核查</td><td><span class="bdg bdg-ok">完成</span></td></tr>
+                <tr><td style="font-size:11px">废气排放趋势分析</td><td><span class="bdg bdg-ok">完成</span></td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="agent-main">
+            <div class="card" style="flex-shrink:0">
+              <div class="card-hd" style="margin-bottom:8px">执行流程</div>
+              <div class="flow-bar">
+                <div class="fb-step"><div class="fb-icon" style="background:#EAF3DE;color:#3B6D11"><i class="ti ti-route" aria-hidden="true"></i></div><div class="fb-lbl">意图识别</div></div>
+                <div class="fb-step"><div class="fb-icon" style="background:#EAF3DE;color:#3B6D11"><i class="ti ti-search" aria-hidden="true"></i></div><div class="fb-lbl">知识检索</div></div>
+                <div class="fb-step"><div class="fb-icon" style="background:#FAEEDA;color:#854F0B"><i class="ti ti-tool" aria-hidden="true"></i></div><div class="fb-lbl">工具调用</div></div>
+                <div class="fb-step"><div class="fb-icon" style="background:var(--color-background-secondary);color:var(--color-text-tertiary)"><i class="ti ti-report" aria-hidden="true"></i></div><div class="fb-lbl">生成报告</div></div>
+              </div>
+            </div>
+            <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+              <div class="card-hd">执行日志 · 鑫达化工废水超标合规检查</div>
+              <div class="log-area">
+                <div><span class="log-ok">✓</span> <span class="log-name">意图识别</span> → 合规检查任务，启动工作流</div>
+                <div><span class="log-ok">✓</span> <span class="log-name">知识库检索</span> → 匹配 GB 8978、HJ 91.1 等 4 份文档</div>
+                <div><span class="log-ok">✓</span> <span class="log-name">工具调用</span> → 查询在线监控数据（DW001，近 30 天）</div>
+                <div><span class="log-run">⟳</span> <span class="log-name">工具调用</span> → 查询排污许可证信息…</div>
+                <div style="color:var(--color-text-tertiary)">  · 待执行：生成合规分析报告</div>
+                <div style="color:var(--color-text-tertiary)">  · 待执行：标注超标风险点</div>
+              </div>
+            </div>
+          </div>
+          <div class="agent-right">
+            <div class="card" style="flex-shrink:0">
+              <div class="card-hd">可用工具</div>
+              <div class="step-item"><div class="step-dot sd-ok"><i class="ti ti-check" style="font-size:9px" aria-hidden="true"></i></div><div><div class="step-name" style="font-size:11px">在线监控数据</div><div class="step-desc">废水/废气实时数据</div></div></div>
+              <div class="step-item"><div class="step-dot sd-ok"><i class="ti ti-check" style="font-size:9px" aria-hidden="true"></i></div><div><div class="step-name" style="font-size:11px">排污许可证查询</div><div class="step-desc">企业许可信息</div></div></div>
+              <div class="step-item"><div class="step-dot sd-wait"></div><div><div class="step-name" style="font-size:11px">法规库检索</div><div class="step-desc">待接入</div></div></div>
+              <div class="step-item" style="border:none"><div class="step-dot sd-wait"></div><div><div class="step-name" style="font-size:11px">气象数据</div><div class="step-desc">待接入</div></div></div>
+            </div>
+            <div class="card" style="flex:1">
+              <div class="card-hd">输出结果</div>
+              <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6">任务完成后，报告将在此处展示，支持复制或导出 Word。</div>
+              <button class="act-btn" style="width:100%;justify-content:center;margin-top:10px;opacity:.4" disabled><i class="ti ti-download" aria-hidden="true"></i> 导出报告</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 系统监控 -->
+      <div id="p-monitor" class="page">
+        <div class="monitor-body">
+          <div class="stat-grid stat-g4">
+            <div class="sc"><div class="sc-lbl">服务可用率</div><div class="sc-val sc-ok">99.8%</div><div class="sc-sub">近 30 天</div></div>
+            <div class="sc"><div class="sc-lbl">平均响应时长</div><div class="sc-val">1.24s</div><div class="sc-sub">问答 1.8s · Embedding 0.4s</div></div>
+            <div class="sc"><div class="sc-lbl">今日 Token 消耗</div><div class="sc-val sc-blue">48,200</div><div class="sc-sub">输入 31k · 输出 17k</div></div>
+            <div class="sc"><div class="sc-lbl">本月累计费用</div><div class="sc-val">¥24.6</div><div class="sc-sub sc-ok">较上月 ↓ 12%</div></div>
+          </div>
+          <div class="g3" style="flex:1;overflow:hidden">
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">近 7 天 Token 消耗趋势</div>
+              <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end">
+                <div class="mini-chart" style="height:80px;align-items:flex-end">
+                  <div class="bar-c" style="height:45%;flex:1"></div>
+                  <div class="bar-c" style="height:60%;flex:1"></div>
+                  <div class="bar-c" style="height:38%;flex:1"></div>
+                  <div class="bar-c" style="height:72%;flex:1"></div>
+                  <div class="bar-c" style="height:55%;flex:1"></div>
+                  <div class="bar-c" style="height:48%;flex:1"></div>
+                  <div class="bar-c hi" style="height:82%;flex:1"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:4px 2px 0;font-size:10px;color:var(--color-text-tertiary)">
+                  <span>5/5</span><span>5/6</span><span>5/7</span><span>5/8</span><span>5/9</span><span>5/10</span><span>今天</span>
+                </div>
+              </div>
+              <div style="margin-top:10px;border-top:0.5px solid var(--color-border-tertiary);padding-top:10px">
+                <div class="prog-row"><span class="prog-lbl">问答调用</span><div class="prog-track"><div class="prog-fill" style="width:64%"></div></div><span class="prog-val">64%</span></div>
+                <div class="prog-row"><span class="prog-lbl">Agent 任务</span><div class="prog-track"><div class="prog-fill" style="width:28%;background:#7F77DD"></div></div><span class="prog-val">28%</span></div>
+                <div class="prog-row"><span class="prog-lbl">Embedding</span><div class="prog-track"><div class="prog-fill" style="width:8%;background:#1D9E75"></div></div><span class="prog-val">8%</span></div>
+              </div>
+            </div>
+            <div class="card" style="display:flex;flex-direction:column;grid-column:span 2">
+              <div class="card-hd">最近调用记录</div>
+              <table class="tbl">
+                <tr><th>时间</th><th>用户</th><th>模型</th><th>调用类型</th><th>输入 Token</th><th>输出 Token</th><th>耗时</th><th>费用</th><th>状态</th></tr>
+                <tr><td style="color:var(--color-text-tertiary)">14:32:10</td><td style="color:var(--color-text-secondary)">张析</td><td style="color:var(--color-text-secondary)">claude-sonnet</td><td><span class="bdg bdg-info">问答</span></td><td style="color:var(--color-text-secondary)">1,840</td><td style="color:var(--color-text-secondary)">1,020</td><td style="color:var(--color-text-secondary)">1.2s</td><td style="color:var(--color-text-secondary)">¥0.04</td><td><span class="bdg bdg-ok">成功</span></td></tr>
+                <tr><td style="color:var(--color-text-tertiary)">14:28:44</td><td style="color:var(--color-text-secondary)">王检</td><td style="color:var(--color-text-secondary)">claude-sonnet</td><td><span class="bdg bdg-purple">Agent</span></td><td style="color:var(--color-text-secondary)">5,120</td><td style="color:var(--color-text-secondary)">3,200</td><td style="color:var(--color-text-secondary)">4.6s</td><td style="color:var(--color-text-secondary)">¥0.18</td><td><span class="bdg bdg-ok">成功</span></td></tr>
+                <tr><td style="color:var(--color-text-tertiary)">14:15:02</td><td style="color:var(--color-text-secondary)">张析</td><td style="color:var(--color-text-secondary)">embedding</td><td><span class="bdg bdg-gray">向量化</span></td><td style="color:var(--color-text-secondary)">12,400</td><td style="color:var(--color-text-secondary)">—</td><td style="color:var(--color-text-secondary)">0.8s</td><td style="color:var(--color-text-secondary)">¥0.01</td><td><span class="bdg bdg-ok">成功</span></td></tr>
+                <tr><td style="color:var(--color-text-tertiary)">13:58:33</td><td style="color:var(--color-text-secondary)">陈局</td><td style="color:var(--color-text-secondary)">claude-sonnet</td><td><span class="bdg bdg-info">问答</span></td><td style="color:var(--color-text-secondary)">2,240</td><td style="color:var(--color-text-secondary)">890</td><td style="color:var(--color-text-secondary)">1.5s</td><td style="color:var(--color-text-secondary)">¥0.05</td><td><span class="bdg bdg-ok">成功</span></td></tr>
+                <tr><td style="color:var(--color-text-tertiary)">13:42:17</td><td style="color:var(--color-text-secondary)">李工</td><td style="color:var(--color-text-secondary)">claude-sonnet</td><td><span class="bdg bdg-purple">Agent</span></td><td style="color:var(--color-text-secondary)">4,880</td><td style="color:var(--color-text-secondary)">2,640</td><td style="color:var(--color-text-secondary)">5.2s</td><td style="color:var(--color-text-secondary)">¥0.16</td><td><span class="bdg bdg-warn">超时</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 用户管理 -->
+      <div id="p-users" class="page">
+        <div class="inner-page">
+          <div class="row-act">
+            <div class="tab-strip"><div class="ts-item on">全部用户</div><div class="ts-item">执法人员</div><div class="ts-item">监测分析员</div><div class="ts-item">管理层</div></div>
+            <div style="flex:1"></div>
+            <button class="pri-btn"><i class="ti ti-user-plus" aria-hidden="true"></i> 新增用户</button>
+          </div>
+          <div class="g2" style="flex:1;overflow:hidden">
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">用户列表</div>
+              <table class="tbl">
+                <tr><th>姓名</th><th>角色</th><th>部门</th><th>最近登录</th><th>状态</th></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:7px"><div class="av av-b">陈</div><span style="font-weight:500">陈局长</span></div></td><td><span class="bdg bdg-purple">管理层</span></td><td style="color:var(--color-text-secondary)">局办公室</td><td style="color:var(--color-text-tertiary)">今天 09:12</td><td><span class="bdg bdg-ok">启用</span></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:7px"><div class="av av-t">张</div><span style="font-weight:500">张析</span></div></td><td><span class="bdg" style="background:#E1F5EE;color:#0F6E56">监测分析员</span></td><td style="color:var(--color-text-secondary)">监测科</td><td style="color:var(--color-text-tertiary)">今天 14:30</td><td><span class="bdg bdg-ok">启用</span></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:7px"><div class="av av-a">王</div><span style="font-weight:500">王检</span></div></td><td><span class="bdg bdg-warn">执法人员</span></td><td style="color:var(--color-text-secondary)">执法大队</td><td style="color:var(--color-text-tertiary)">今天 11:45</td><td><span class="bdg bdg-ok">启用</span></td></tr>
+                <tr><td><div style="display:flex;align-items:center;gap:7px"><div class="av av-a">李</div><span style="font-weight:500">李工</span></div></td><td><span class="bdg bdg-warn">执法人员</span></td><td style="color:var(--color-text-secondary)">执法大队</td><td style="color:var(--color-text-tertiary)">昨天 16:20</td><td><span class="bdg bdg-ok">启用</span></td></tr>
+              </table>
+            </div>
+            <div class="card" style="display:flex;flex-direction:column">
+              <div class="card-hd">角色权限矩阵</div>
+              <table class="tbl">
+                <tr><th>功能模块</th><th>执法人员</th><th>监测分析员</th><th>管理层</th></tr>
+                <tr><td>AI 智能问答</td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>知识库查询</td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>知识库上传</td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>污染源档案</td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>Agent 任务</td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>系统监控</td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+                <tr><td>用户管理</td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-minus" style="color:var(--color-text-tertiary)" aria-label="无权限"></i></td><td><i class="ti ti-check" style="color:#3B6D11" aria-label="有权限"></i></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const titles={dash:'工作台概览',chat:'AI 智能问答',kb:'知识库管理',source:'污染源档案',agent:'Agent 任务',monitor:'系统监控',users:'用户管理'};
+const allPages=['dash','chat','kb','source','agent','monitor','users'];
+function go(id,tabEl,navEl){
+  allPages.forEach(p=>{
+    const el=document.getElementById('p-'+p);
+    if(el){el.classList.remove('on');el.style.display='';}
+  });
+  const target=document.getElementById('p-'+id);
+  if(target){target.classList.add('on');}
+  document.querySelectorAll('.ts-item').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.ni[id]').forEach(n=>n.classList.remove('on'));
+  if(tabEl) tabEl.classList.add('on');
+  const ni=document.getElementById('ni-'+id);
+  if(ni) ni.classList.add('on');
+  if(navEl){document.querySelectorAll('.ni[id]').forEach(n=>n.classList.remove('on'));navEl.classList.add('on');}
+  document.getElementById('tb-title').textContent=titles[id];
+}
+function showChat(){
+  document.getElementById('ca-empty').style.display='none';
+  document.getElementById('ca-msgs').style.display='flex';
+  document.getElementById('ca-msgs').style.flexDirection='column';
+  document.getElementById('rp-empty').style.display='none';
+  document.getElementById('rp-refs').style.display='flex';
+}
+</script>
