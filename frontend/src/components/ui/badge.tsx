@@ -5,10 +5,10 @@ export function Badge(props: { children: ReactNode; tone?: 'neutral' | 'good' | 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]',
-        props.tone === 'good' && 'border-emerald-400/25 bg-emerald-400/10 text-emerald-100',
-        props.tone === 'warn' && 'border-amber-300/25 bg-amber-300/10 text-amber-50',
-        (!props.tone || props.tone === 'neutral') && 'border-white/12 bg-white/[0.05] text-white/60'
+        'inline-flex items-center rounded border px-2.5 py-1 text-[12px] font-medium uppercase tracking-normal',
+        props.tone === 'good' && 'border-[#c2e7b0] bg-[#f0f9eb] text-[#529b2e]',
+        props.tone === 'warn' && 'border-[#f3d19e] bg-[#fdf6ec] text-[#b88230]',
+        (!props.tone || props.tone === 'neutral') && 'border-[#d9ecff] bg-[#ecf5ff] text-[#409eff]'
       )}
     >
       {props.children}

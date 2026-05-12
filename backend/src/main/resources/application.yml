@@ -37,6 +37,9 @@ app:
     api-key: ${OPENAI_API_KEY:demo-key}
     chat-model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
     embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    embedding-base-url: ${OPENAI_EMBEDDING_BASE_URL:}
+    embedding-api-key: ${OPENAI_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
+    embedding-dimensions-enabled: ${OPENAI_EMBEDDING_DIMENSIONS_ENABLED:true}
   vector:
     dimensions: ${VECTOR_DIMENSIONS:1536}
     similarity-threshold: ${VECTOR_SIMILARITY_THRESHOLD:0.65}

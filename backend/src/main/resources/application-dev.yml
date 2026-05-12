@@ -34,9 +34,12 @@ app:
     base-url: http://101.133.238.173:8317/v1
     api-key: sk-2BJiOasP3SP6qZjDC
     chat-model: gpt-5.4
-    embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    embedding-model: tongyi-embedding-vision-plus-2026-03-06
+    embedding-base-url: ${OPENAI_EMBEDDING_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+    embedding-api-key: ${OPENAI_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
+    embedding-dimensions-enabled: ${OPENAI_EMBEDDING_DIMENSIONS_ENABLED:false}
   vector:
-    dimensions: ${VECTOR_DIMENSIONS:1536}
+    dimensions: ${VECTOR_DIMENSIONS:1024}
     similarity-threshold: ${VECTOR_SIMILARITY_THRESHOLD:0.65}
   storage:
     base-path: ${APP_STORAGE_BASE_PATH:./data}

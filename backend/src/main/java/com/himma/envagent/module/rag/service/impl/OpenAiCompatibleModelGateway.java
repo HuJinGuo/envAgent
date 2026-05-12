@@ -42,23 +42,50 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
 
     public OpenAiCompatibleModelGateway(OpenAiProperties openAiProperties, VectorProperties vectorProperties) {
         this.vectorProperties = vectorProperties;
-        String baseUrl = trimTrailingSlash(openAiProperties.getBaseUrl());
-        String apiKey = normalizeApiKey(openAiProperties.getApiKey());
+        String chatBaseUrl = trimTrailingSlash(openAiProperties.getBaseUrl());
+        String chatApiKey = normalizeApiKey(openAiProperties.getApiKey());
+        String embeddingBaseUrl = trimTrailingSlash(firstNonBlank(
+                openAiProperties.getEmbeddingBaseUrl(),
+                openAiProperties.getBaseUrl()
+        ));
+        String embeddingApiKey = normalizeApiKey(firstNonBlank(
+                openAiProperties.getEmbeddingApiKey(),
+                openAiProperties.getApiKey()
+        ));
+        log.info(
+                "model gateway initialized, chatModel={}, chatBaseUrl={}, embeddingModel={}, embeddingBaseUrl={}, vectorDimensions={}, embeddingDimensionsEnabled={}",
+                openAiProperties.getChatModel(),
+                chatBaseUrl,
+                openAiProperties.getEmbeddingModel(),
+                embeddingBaseUrl,
+                vectorProperties.getDimensions(),
+                openAiProperties.isEmbeddingDimensionsEnabled()
+        );
         // 这里用 LangChain4j 封装 OpenAI-compatible 接口，外层业务只依赖 ModelGateway。
         this.chatModel = OpenAiChatModel.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
+                .baseUrl(chatBaseUrl)
+                .apiKey(chatApiKey)
                 .modelName(openAiProperties.getChatModel())
                 .temperature(0.2)
                 .maxRetries(1)
                 .build();
-        this.embeddingModel = OpenAiEmbeddingModel.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
+        this.embeddingModel = buildEmbeddingModel(openAiProperties, embeddingBaseUrl, embeddingApiKey);
+    }
+
+    private EmbeddingModel buildEmbeddingModel(
+            OpenAiProperties openAiProperties,
+            String embeddingBaseUrl,
+            String embeddingApiKey
+    ) {
+        var builder = OpenAiEmbeddingModel.builder()
+                .baseUrl(embeddingBaseUrl)
+                .apiKey(embeddingApiKey)
                 .modelName(openAiProperties.getEmbeddingModel())
-                .dimensions(vectorProperties.getDimensions())
-                .maxRetries(1)
-                .build();
+                .maxRetries(1);
+        if (openAiProperties.isEmbeddingDimensionsEnabled()) {
+            builder.dimensions(vectorProperties.getDimensions());
+        }
+        return builder.build();
     }
 
     @Override
@@ -208,6 +235,13 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
 
     private String normalizeApiKey(String value) {
         return value == null || value.isBlank() ? "demo-key" : value.trim();
+    }
+
+    private String firstNonBlank(String first, String fallback) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return fallback;
     }
 
     private String trimTrailingSlash(String value) {

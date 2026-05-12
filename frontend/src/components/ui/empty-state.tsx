@@ -10,13 +10,13 @@ export function EmptyState(props: {
   const Icon = props.icon;
 
   return (
-    <div className="rounded-[28px] border border-dashed border-white/12 bg-white/[0.03] px-5 py-8 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.06] text-white/62">
+    <div className="relative overflow-hidden rounded border border-dashed border-[#dcdfe6] bg-white px-5 py-10 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded border border-[#d9ecff] bg-[#ecf5ff] text-[#409eff]">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold text-white">{props.title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/55">{props.description}</p>
-      {props.action ? <div className="mt-5">{props.action}</div> : null}
+      <h3 className="mt-5 text-xl font-semibold text-[#303133]">{props.title}</h3>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#606266]">{props.description}</p>
+      {props.action ? <div className="mt-6">{props.action}</div> : null}
     </div>
   );
 }

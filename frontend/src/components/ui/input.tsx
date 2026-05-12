@@ -6,8 +6,8 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        'h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-white outline-none transition',
-        'placeholder:text-white/28 focus:border-[#d7ff64]/40 focus:bg-black/28',
+        'h-10 w-full rounded border border-[#dcdfe6] bg-white px-3 text-sm text-[#303133] outline-none transition duration-150',
+        'placeholder:text-[#c0c4cc] focus:border-[#409eff] focus:shadow-[0_0_0_2px_rgba(64,158,255,0.12)]',
         props.className
       )}
     />

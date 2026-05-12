@@ -1,79 +1,242 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Manrope", sans-serif;
-  --font-display: "Fraunces", serif;
+  --font-sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --color-primary: #409eff;
+  --color-primary-soft: #ecf5ff;
+  --color-bg: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-border: #dcdfe6;
+  --color-border-light: #ebeef5;
+  --color-text: #303133;
+  --color-text-regular: #606266;
+  --color-text-secondary: #909399;
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
-  min-height: 100%;
-  background:
-    radial-gradient(circle at top left, rgba(215, 255, 100, 0.1), transparent 24%),
-    radial-gradient(circle at top right, rgba(255, 164, 91, 0.1), transparent 22%),
-    #081013;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: var(--font-sans);
-  background: transparent;
-  color: #f6faf7;
-}
-
-button,
-input {
-  font: inherit;
-}
-
+html,
+body,
 #root {
   min-height: 100vh;
 }
 
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
 .app-shell {
-  position: relative;
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(272px, 320px) minmax(0, 1fr);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
-    rgba(3, 10, 12, 0.72);
+  grid-template-columns: 280px minmax(0, 1fr);
+  background: var(--color-bg);
 }
 
-.app-shell::before {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-  background-size: 28px 28px;
-  content: "";
-  opacity: 0.4;
-  pointer-events: none;
+.app-noise,
+.app-shell::before,
+.app-shell::after {
+  display: none;
 }
 
-.app-noise {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(215, 255, 100, 0.05), transparent 20%),
-    radial-gradient(circle at 80% 10%, rgba(255, 164, 91, 0.07), transparent 24%),
-    radial-gradient(circle at 50% 80%, rgba(67, 179, 174, 0.08), transparent 20%);
-  filter: blur(12px);
-  pointer-events: none;
+.app-shell > aside {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 100vh;
+  overflow: auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface) !important;
 }
 
-@media (max-width: 1100px) {
+.app-shell > aside > div {
+  gap: 18px;
+  padding: 16px 14px;
+}
+
+.app-shell > aside > div > div:first-child > div:first-child,
+.app-shell > aside > div > div:last-child {
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: 4px !important;
+  background: #fafafa !important;
+}
+
+.app-shell > aside nav {
+  gap: 6px;
+  scrollbar-width: none;
+}
+
+.app-shell > aside nav::-webkit-scrollbar {
+  display: none;
+}
+
+.app-shell > aside nav button {
+  min-height: 44px;
+  border-radius: 4px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--color-text-regular) !important;
+}
+
+.app-shell > aside nav button:hover {
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary) !important;
+}
+
+.app-shell > aside nav button[class*="d7ff64"] {
+  border-color: #b3d8ff !important;
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary) !important;
+}
+
+.app-shell > main {
+  min-width: 0;
+  background: var(--color-bg);
+}
+
+.app-shell > main > header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--color-border) !important;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 18px 24px !important;
+  backdrop-filter: blur(8px);
+}
+
+.app-shell > main > header h1 {
+  color: var(--color-text) !important;
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
+.app-shell > main > header p {
+  color: var(--color-text-secondary) !important;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+}
+
+.app-shell > main > div {
+  padding: 20px 24px 28px !important;
+}
+
+.app-shell thead {
+  background: #f5f7fa !important;
+  color: var(--color-text-secondary) !important;
+}
+
+.app-shell th {
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text-regular) !important;
+  font-size: 13px;
+  font-weight: 600 !important;
+}
+
+.app-shell td {
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text-regular) !important;
+}
+
+.app-shell tr:hover td {
+  background: #fafcff;
+}
+
+.app-shell [class*="text-white"] {
+  color: var(--color-text) !important;
+}
+
+.app-shell [class*="text-white/"] {
+  color: var(--color-text-secondary) !important;
+}
+
+.app-shell [class*="border-white"] {
+  border-color: var(--color-border-light) !important;
+}
+
+.app-shell [class*="bg-white/"],
+.app-shell [class*="bg-black/"],
+.app-shell [class*="bg-[#081214"] {
+  background: var(--color-surface) !important;
+}
+
+.app-shell [class*="bg-[#d7ff64"],
+.app-shell [class*="bg-[#1f6fb6"] {
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.app-shell [class*="rounded-[28px]"],
+.app-shell [class*="rounded-[24px]"],
+.app-shell [class*="rounded-2xl"],
+.app-shell [class*="rounded-xl"] {
+  border-radius: 4px !important;
+}
+
+.app-shell [class*="shadow-"] {
+  box-shadow: none !important;
+}
+
+.app-shell [class*="border-amber"] {
+  border-color: #f3d19e !important;
+  background: #fdf6ec !important;
+  color: #a66a00 !important;
+}
+
+.app-shell [class*="border-emerald"] {
+  border-color: #c2e7b0 !important;
+  background: #f0f9eb !important;
+  color: #3f8f20 !important;
+}
+
+@media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .app-shell > aside {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .app-shell > aside nav {
+    display: flex !important;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .app-shell > aside nav button {
+    min-width: 168px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell > main > header,
+  .app-shell > main > div {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+
+  .app-shell > main > header h1 {
+    font-size: 20px !important;
   }
 }

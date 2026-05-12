@@ -9,6 +9,9 @@ public class OpenAiProperties {
     private String apiKey;
     private String chatModel;
     private String embeddingModel;
+    private String embeddingBaseUrl;
+    private String embeddingApiKey;
+    private Boolean embeddingDimensionsEnabled;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -40,5 +43,29 @@ public class OpenAiProperties {
 
     public void setEmbeddingModel(String embeddingModel) {
         this.embeddingModel = embeddingModel;
+    }
+
+    public String getEmbeddingBaseUrl() {
+        return embeddingBaseUrl;
+    }
+
+    public void setEmbeddingBaseUrl(String embeddingBaseUrl) {
+        this.embeddingBaseUrl = embeddingBaseUrl;
+    }
+
+    public String getEmbeddingApiKey() {
+        return embeddingApiKey;
+    }
+
+    public void setEmbeddingApiKey(String embeddingApiKey) {
+        this.embeddingApiKey = embeddingApiKey;
+    }
+
+    public boolean isEmbeddingDimensionsEnabled() {
+        return embeddingDimensionsEnabled == null || embeddingDimensionsEnabled;
+    }
+
+    public void setEmbeddingDimensionsEnabled(Boolean embeddingDimensionsEnabled) {
+        this.embeddingDimensionsEnabled = embeddingDimensionsEnabled;
     }
 }
