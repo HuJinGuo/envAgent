@@ -51,6 +51,8 @@ class AuthControllerTest {
     @Test
     void shouldRejectMeWithoutToken() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(40100))
+                .andExpect(jsonPath("$.msg").value("未登录或令牌无效"));
     }
 }

@@ -7,11 +7,13 @@ import type {
   KnowledgeWorkspace,
   LoginResponse,
   MonitorWorkspace,
+  ReferenceCard,
   SourceWorkspace,
   SystemHealthPayload,
   UserProfile,
   UsersWorkspace
 } from '../lib/api';
+import { apiRoutes } from '../lib/api';
 
 const adminUser: UserProfile = {
   id: 1,
@@ -55,121 +57,194 @@ const dashboard: DashboardSnapshot = {
     { label: '内部文件', percent: 42, color: '#7be3c6' }
   ],
   taskStatus: [
-    { id: 'ts1', label: '问答闭环', value: '稳定运行', note: 'SSE 来源引用待接后端 payload' },
-    { id: 'ts2', label: '知识入库', value: '解析中 9 份', note: '切片与向量化串行调度' },
-    { id: 'ts3', label: '权限体系', value: '基础完成', note: 'RBAC 页面层尚未接真接口' }
+    { id: 'ts1', label: '问答闭环', value: '稳定运行', note: 'SSE 与 sources 事件已提供 mock' },
+    { id: 'ts2', label: '知识入库', value: '解析中 2 份', note: 'upload/status mock 可轮询' },
+    { id: 'ts3', label: '权限体系', value: '基础完成', note: 'RBAC 页面层仍沿用既有 mock' }
   ]
 };
 
-const chatWorkspace: ChatWorkspace = {
-  sessions: [
-    { id: 's1', title: '鑫达化工近 30 天 COD 趋势分析', group: '今天', updatedAt: '14:32' },
-    { id: 's2', title: 'GB 8978 二级标准适用范围', group: '今天', updatedAt: '13:48' },
-    { id: 's3', title: '现场检查笔录辅助生成', group: '昨天', updatedAt: '17:06' },
-    { id: 's4', title: '排污许可到期企业筛查', group: '更早', updatedAt: '周一' }
-  ],
-  scopes: [
-    { id: 'kb1', label: '法规标准库', enabled: true },
-    { id: 'kb2', label: '排污许可证库', enabled: true },
-    { id: 'kb3', label: '监测日报库', enabled: false }
-  ],
-  suggestions: [
-    '对近 30 天 COD 超标情况做摘要',
-    '列出许可即将到期的重点企业',
-    '根据监测数据生成现场核查建议',
-    '解释 GB 8978 二级标准适用条件'
-  ],
-  messages: [
-    {
-      id: 'm1',
-      role: 'user',
-      content: '请分析鑫达化工近 30 天 COD 超标情况，并给出执法建议。'
-    },
-    {
-      id: 'm2',
-      role: 'assistant',
-      content:
-        '根据调取的监测数据和知识库法规，近 30 天共监测 28 次，其中 6 次超标，最高值 186 mg/L，出现在 5 月 8 日。企业属于化工行业，执行 GB 8978-1996《污水综合排放标准》二级限值，COD 应不高于 150 mg/L。建议启动现场核查程序，并要求企业限期整改。',
-      citations: ['GB 8978', '监测日报 2026-05', '排污许可证副本']
-    }
-  ],
-  references: [
-    {
-      id: 'r1',
-      title: 'GB 8978-1996 污水综合排放标准',
-      excerpt: '化工行业执行二级限值时，COD 排放浓度应满足 150 mg/L 要求。',
-      source: '法规标准库',
-      score: 0.94
-    },
-    {
-      id: 'r2',
-      title: '鑫达化工 2026 年 5 月在线监测日报',
-      excerpt: '5 月 8 日 10:15 监测到 COD 186 mg/L，为本月峰值。',
-      source: '监测日报库',
-      score: 0.89
-    },
-    {
-      id: 'r3',
-      title: '鑫达化工排污许可证摘要',
-      excerpt: '废水排口 DW001，许可执行标准引用 GB 8978-1996 二级限值。',
-      source: '许可证库',
-      score: 0.82
-    }
-  ]
+type MockKnowledgeBase = {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
-const knowledgeWorkspace: KnowledgeWorkspace = {
-  summary: [
-    { id: 'k1', label: '知识库总量', value: '213 份', note: '本周新增 12 份' },
-    { id: 'k2', label: '解析队列', value: '9 份', note: '3 份等待切片' },
-    { id: 'k3', label: '向量切片', value: '18,420 段', note: '当前维度 1536' }
-  ],
-  categories: [
-    { id: 'all', label: '全部', count: 213 },
-    { id: 'law', label: '法规标准', count: 88 },
-    { id: 'permit', label: '许可证', count: 46 },
-    { id: 'monitor', label: '监测日报', count: 54 },
-    { id: 'internal', label: '内部文件', count: 25 }
-  ],
-  documents: [
-    {
-      id: 'd1',
-      name: 'GB 8978-1996 污水综合排放标准.pdf',
-      category: '法规标准',
-      size: '2.4 MB',
-      chunks: 114,
-      uploadedAt: '今天 09:20',
-      status: '已入库'
-    },
-    {
-      id: 'd2',
-      name: '鑫达化工 2026-05 在线监测日报.xlsx',
-      category: '监测日报',
-      size: '1.1 MB',
-      chunks: 36,
-      uploadedAt: '今天 11:42',
-      status: '解析中'
-    },
-    {
-      id: 'd3',
-      name: '排污许可证到期提醒名单.docx',
-      category: '许可证',
-      size: '480 KB',
-      chunks: 18,
-      uploadedAt: '昨天 16:05',
-      status: '待切片'
-    },
-    {
-      id: 'd4',
-      name: '突发环境事件应急预案手册.pdf',
-      category: '内部文件',
-      size: '4.8 MB',
-      chunks: 202,
-      uploadedAt: '周一 10:16',
-      status: '已入库'
-    }
-  ]
+type MockDocument = {
+  id: string;
+  name: string;
+  knowledgeBaseId: string;
+  knowledgeBaseName: string;
+  sizeBytes: number;
+  chunkCount: number;
+  createdAt: string;
+  updatedAt: string;
+  status: 'READY' | 'PROCESSING' | 'PENDING';
 };
+
+type MockConversation = {
+  id: string;
+  title: string;
+  updatedAt: string;
+};
+
+type MockMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  sources?: ReferenceCard[];
+};
+
+let knowledgeBases: MockKnowledgeBase[] = [
+  {
+    id: 'kb-law',
+    name: '法规标准库',
+    description: '国家与地方生态环境法规',
+    createdAt: '2026-05-01T09:00:00.000Z',
+    updatedAt: '2026-05-12T09:20:00.000Z'
+  },
+  {
+    id: 'kb-permit',
+    name: '排污许可证库',
+    description: '许可证文本和摘要',
+    createdAt: '2026-05-02T09:00:00.000Z',
+    updatedAt: '2026-05-11T16:05:00.000Z'
+  },
+  {
+    id: 'kb-monitor',
+    name: '监测日报库',
+    description: '企业在线监测日报',
+    createdAt: '2026-05-03T09:00:00.000Z',
+    updatedAt: '2026-05-12T11:42:00.000Z'
+  }
+];
+
+let documents: MockDocument[] = [
+  {
+    id: 'd1',
+    name: 'GB 8978-1996 污水综合排放标准.pdf',
+    knowledgeBaseId: 'kb-law',
+    knowledgeBaseName: '法规标准库',
+    sizeBytes: 2_516_582,
+    chunkCount: 114,
+    createdAt: '2026-05-12T09:20:00.000Z',
+    updatedAt: '2026-05-12T09:25:00.000Z',
+    status: 'READY'
+  },
+  {
+    id: 'd2',
+    name: '鑫达化工 2026-05 在线监测日报.xlsx',
+    knowledgeBaseId: 'kb-monitor',
+    knowledgeBaseName: '监测日报库',
+    sizeBytes: 1_153_433,
+    chunkCount: 12,
+    createdAt: '2026-05-12T11:42:00.000Z',
+    updatedAt: '2026-05-12T11:42:00.000Z',
+    status: 'PROCESSING'
+  },
+  {
+    id: 'd3',
+    name: '排污许可证到期提醒名单.docx',
+    knowledgeBaseId: 'kb-permit',
+    knowledgeBaseName: '排污许可证库',
+    sizeBytes: 491_520,
+    chunkCount: 0,
+    createdAt: '2026-05-11T16:05:00.000Z',
+    updatedAt: '2026-05-11T16:05:00.000Z',
+    status: 'PENDING'
+  }
+];
+
+const documentChecks = new Map<string, number>();
+
+let conversations: MockConversation[] = [
+  { id: 's1', title: '鑫达化工近 30 天 COD 趋势分析', updatedAt: '2026-05-12T14:32:00.000Z' },
+  { id: 's2', title: 'GB 8978 二级标准适用范围', updatedAt: '2026-05-12T13:48:00.000Z' },
+  { id: 's3', title: '现场检查笔录辅助生成', updatedAt: '2026-05-11T17:06:00.000Z' }
+];
+
+const baseReferences: ReferenceCard[] = [
+  {
+    id: 'r1',
+    title: 'GB 8978-1996 污水综合排放标准',
+    excerpt: '化工行业执行二级限值时，COD 排放浓度应满足 150 mg/L 要求。',
+    source: '法规标准库',
+    score: 0.94
+  },
+  {
+    id: 'r2',
+    title: '鑫达化工 2026 年 5 月在线监测日报',
+    excerpt: '5 月 8 日 10:15 监测到 COD 186 mg/L，为本月峰值。',
+    source: '监测日报库',
+    score: 0.89
+  },
+  {
+    id: 'r3',
+    title: '鑫达化工排污许可证摘要',
+    excerpt: '废水排口 DW001，许可执行标准引用 GB 8978-1996 二级限值。',
+    source: '排污许可证库',
+    score: 0.82
+  }
+];
+
+const conversationMessages = new Map<string, MockMessage[]>([
+  [
+    's1',
+    [
+      {
+        id: 'm1',
+        role: 'user',
+        content: '请分析鑫达化工近 30 天 COD 超标情况，并给出执法建议。',
+        createdAt: '2026-05-12T14:31:00.000Z'
+      },
+      {
+        id: 'm2',
+        role: 'assistant',
+        content:
+          '根据调取的监测数据和知识库法规，近 30 天共监测 28 次，其中 6 次超标，最高值 186 mg/L，出现在 5 月 8 日。企业执行 GB 8978-1996 二级限值，建议启动现场核查并核验预处理设施运行记录。',
+        createdAt: '2026-05-12T14:32:00.000Z',
+        sources: baseReferences
+      }
+    ]
+  ],
+  [
+    's2',
+    [
+      {
+        id: 'm3',
+        role: 'user',
+        content: 'GB 8978 二级标准适用于哪些场景？',
+        createdAt: '2026-05-12T13:47:00.000Z'
+      },
+      {
+        id: 'm4',
+        role: 'assistant',
+        content: '二级标准主要适用于未纳入特别行业一级限值但需满足综合排放要求的场景，具体仍需结合行业、区域和许可证约束判定。',
+        createdAt: '2026-05-12T13:48:00.000Z',
+        sources: [baseReferences[0]]
+      }
+    ]
+  ],
+  [
+    's3',
+    [
+      {
+        id: 'm5',
+        role: 'user',
+        content: '生成现场检查笔录提纲。',
+        createdAt: '2026-05-11T17:04:00.000Z'
+      },
+      {
+        id: 'm6',
+        role: 'assistant',
+        content: '建议围绕排口、在线监测、台账、药剂投加、应急措施五个部分展开记录。',
+        createdAt: '2026-05-11T17:06:00.000Z'
+      }
+    ]
+  ]
+]);
 
 const sourceWorkspace: SourceWorkspace = {
   enterprises: [
@@ -341,12 +416,144 @@ function success<T>(data: T) {
   return HttpResponse.json(body);
 }
 
+function requireAuth(auth: string | null) {
+  return auth === `Bearer ${fakeToken}`;
+}
+
+function formatRelativeGroup(updatedAt: string) {
+  const date = new Date(updatedAt);
+  const now = new Date('2026-05-12T15:00:00.000Z');
+  const startA = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startB = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = Math.round((startA.getTime() - startB.getTime()) / 86_400_000);
+  if (diff <= 0) return '今天';
+  if (diff === 1) return '昨天';
+  return '更早';
+}
+
+function latestConversationReferences() {
+  const firstConversation = conversations[0];
+  const messages = firstConversation ? conversationMessages.get(firstConversation.id) ?? [] : [];
+  const assistant = [...messages].reverse().find((item) => item.role === 'assistant' && item.sources?.length);
+  return assistant?.sources ?? baseReferences;
+}
+
+function buildChatWorkspace(): ChatWorkspace {
+  const firstConversation = conversations[0];
+  const currentMessages = firstConversation ? conversationMessages.get(firstConversation.id) ?? [] : [];
+  return {
+    sessions: conversations.map((item) => ({
+      id: item.id,
+      title: item.title,
+      group: formatRelativeGroup(item.updatedAt),
+      updatedAt: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(item.updatedAt))
+    })),
+    scopes: [
+      { id: 'kb-law', label: '法规标准库', enabled: true },
+      { id: 'kb-permit', label: '排污许可证库', enabled: true },
+      { id: 'kb-monitor', label: '监测日报库', enabled: true }
+    ],
+    suggestions: [
+      '对近 30 天 COD 超标情况做摘要',
+      '列出许可即将到期的重点企业',
+      '根据监测数据生成现场核查建议',
+      '解释 GB 8978 二级标准适用条件'
+    ],
+    messages: currentMessages.map((item) => ({
+      id: item.id,
+      role: item.role,
+      content: item.content,
+      citations: item.sources?.map((source) => source.title)
+    })),
+    references: latestConversationReferences()
+  };
+}
+
+function buildKnowledgeWorkspace(): KnowledgeWorkspace {
+  const totalChunks = documents.reduce((sum, item) => sum + item.chunkCount, 0);
+  const processing = documents.filter((item) => item.status !== 'READY').length;
+  return {
+    summary: [
+      { id: 'k1', label: '知识库总量', value: `${documents.length} 份`, note: '与 documents mock 同步' },
+      { id: 'k2', label: '解析队列', value: `${processing} 份`, note: processing ? '轮询 status 可见状态变化' : '当前无处理中任务' },
+      { id: 'k3', label: '向量切片', value: `${totalChunks.toLocaleString()} 段`, note: '按 mock 文档切片数聚合' }
+    ],
+    categories: [
+      { id: 'all', label: '全部', count: documents.length },
+      ...knowledgeBases.map((item) => ({
+        id: item.id,
+        label: item.name,
+        count: documents.filter((document) => document.knowledgeBaseId === item.id).length
+      }))
+    ],
+    documents: documents.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.knowledgeBaseName,
+      size: formatBytes(item.sizeBytes),
+      sizeBytes: item.sizeBytes,
+      chunks: item.chunkCount,
+      uploadedAt: new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(
+        new Date(item.createdAt)
+      ),
+      status: item.status === 'READY' ? 'READY' : item.status === 'PROCESSING' ? 'PROCESSING' : 'PENDING',
+      statusLabel: item.status === 'READY' ? '已入库' : item.status === 'PROCESSING' ? '解析中' : '待切片',
+      isTerminal: item.status === 'READY',
+      knowledgeBaseId: item.knowledgeBaseId,
+      knowledgeBaseName: item.knowledgeBaseName
+    }))
+  };
+}
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+function nextId(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function conversationAnswer(question: string) {
+  const text =
+    `结合知识库与监测数据，针对“${question}”，建议先定位对应企业、时间范围和排口，再交叉核对法规标准、许可证要求与在线监测记录。当前 mock 流会返回摘要、超标判断和执法建议三段内容，便于前端验证边收边渲染与来源面板刷新。`;
+
+  const sources = question.includes('许可证')
+    ? [baseReferences[2], baseReferences[0]]
+    : question.includes('监测')
+      ? [baseReferences[1], baseReferences[0]]
+      : baseReferences;
+
+  return {
+    text,
+    sources
+  };
+}
+
+function createEventStream(parts: Array<{ delayMs: number; chunk: string }>) {
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let elapsed = 0;
+      parts.forEach((part) => {
+        elapsed += part.delayMs;
+        setTimeout(() => {
+          controller.enqueue(encoder.encode(part.chunk));
+        }, elapsed);
+      });
+      setTimeout(() => controller.close(), elapsed + 30);
+    }
+  });
+}
+
 export const handlers = [
-  http.get('/api/system/health', async () => {
+  http.get(apiRoutes.systemHealth, async () => {
     await delay(180);
     return success(healthPayload);
   }),
-  http.post('/api/v1/auth/login', async ({ request }) => {
+  http.post(apiRoutes.login, async ({ request }) => {
     await delay(320);
     const payload = (await request.json()) as { username?: string; password?: string };
 
@@ -370,11 +577,9 @@ export const handlers = [
       { status: 401 }
     );
   }),
-  http.get('/api/v1/auth/me', async ({ request }) => {
+  http.get(apiRoutes.currentUser, async ({ request }) => {
     await delay(160);
-    const auth = request.headers.get('Authorization');
-
-    if (auth === `Bearer ${fakeToken}`) {
+    if (requireAuth(request.headers.get('Authorization'))) {
       return success(adminUser);
     }
 
@@ -387,31 +592,215 @@ export const handlers = [
       { status: 401 }
     );
   }),
-  http.get('/api/mock/dashboard', async () => {
+  http.get(apiRoutes.knowledgeBases, async () => {
+    await delay(180);
+    return success(
+      knowledgeBases.map((item) => ({
+        ...item,
+        documentCount: documents.filter((document) => document.knowledgeBaseId === item.id).length
+      }))
+    );
+  }),
+  http.get(apiRoutes.documents, async ({ request }) => {
+    await delay(220);
+    const url = new URL(request.url);
+    const knowledgeBaseId = url.searchParams.get('knowledgeBaseId');
+    const filtered = knowledgeBaseId ? documents.filter((item) => item.knowledgeBaseId === knowledgeBaseId) : documents;
+    return success(filtered);
+  }),
+  http.post(apiRoutes.documentsUpload, async ({ request }) => {
+    await delay(260);
+    const formData = await request.formData();
+    const uploadedFiles = [
+      ...formData.getAll('file').filter((item): item is File => item instanceof File),
+      ...formData.getAll('files').filter((item): item is File => item instanceof File)
+    ];
+    const knowledgeBaseId = String(formData.get('kbId') ?? formData.get('knowledgeBaseId') ?? knowledgeBases[0]?.id ?? '');
+    const knowledgeBase =
+      knowledgeBases.find((item) => item.id === knowledgeBaseId) ??
+      knowledgeBases[0] ?? {
+        id: 'kb-default',
+        name: '默认知识库',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+    if (!uploadedFiles.length) {
+      return HttpResponse.json({ code: 40000, msg: '上传文件不能为空', data: null }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    const created = uploadedFiles.map((file, index) => ({
+      id: nextId(`doc${index}`),
+      name: file.name,
+      knowledgeBaseId: knowledgeBase.id,
+      knowledgeBaseName: knowledgeBase.name,
+      sizeBytes: file.size || 256_000,
+      chunkCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      status: 'PENDING' as const
+    }));
+
+    documents = [...created, ...documents];
+    knowledgeBases = knowledgeBases.map((item) =>
+      item.id === knowledgeBase.id
+        ? {
+            ...item,
+            updatedAt: now
+          }
+        : item
+    );
+
+    return success(created[0]);
+  }),
+  http.get(`${apiRoutes.documents}/:id`, async ({ params }) => {
+    await delay(140);
+    const document = documents.find((item) => item.id === params.id);
+    if (!document) {
+      return HttpResponse.json({ code: 40400, msg: '文档不存在', data: null }, { status: 404 });
+    }
+    return success(document);
+  }),
+  http.get(`${apiRoutes.documents}/:id/status`, async ({ params }) => {
+    await delay(150);
+    const document = documents.find((item) => item.id === params.id);
+    if (!document) {
+      return HttpResponse.json({ code: 40400, msg: '文档不存在', data: null }, { status: 404 });
+    }
+
+    const checks = (documentChecks.get(document.id) ?? 0) + 1;
+    documentChecks.set(document.id, checks);
+
+    if (document.status === 'PENDING' && checks >= 1) {
+      document.status = 'PROCESSING';
+      document.updatedAt = new Date().toISOString();
+    } else if (document.status === 'PROCESSING' && checks >= 2) {
+      document.status = 'READY';
+      document.chunkCount = document.chunkCount || 24;
+      document.updatedAt = new Date().toISOString();
+    }
+
+    return success(document);
+  }),
+  http.get(apiRoutes.conversations, async () => {
+    await delay(160);
+    return success(conversations);
+  }),
+  http.post(apiRoutes.conversations, async ({ request }) => {
+    await delay(180);
+    const payload = (await request.json().catch(() => ({}))) as { title?: string };
+    const conversation: MockConversation = {
+      id: nextId('conversation'),
+      title: payload.title?.trim() || '新建会话',
+      updatedAt: new Date().toISOString()
+    };
+    conversations = [conversation, ...conversations];
+    conversationMessages.set(conversation.id, []);
+    return success(conversation);
+  }),
+  http.put(`${apiRoutes.conversations}/:id/title`, async ({ params, request }) => {
+    await delay(120);
+    const payload = (await request.json()) as { title?: string };
+    const target = conversations.find((item) => item.id === params.id);
+    if (!target) {
+      return HttpResponse.json({ code: 40400, msg: '会话不存在', data: null }, { status: 404 });
+    }
+    target.title = payload.title?.trim() || target.title;
+    target.updatedAt = new Date().toISOString();
+    return success(target);
+  }),
+  http.delete(`${apiRoutes.conversations}/:id`, async ({ params }) => {
+    await delay(120);
+    conversations = conversations.filter((item) => item.id !== params.id);
+    conversationMessages.delete(String(params.id));
+    return success(null);
+  }),
+  http.get(`${apiRoutes.conversations}/:id/messages`, async ({ params }) => {
+    await delay(180);
+    return success(conversationMessages.get(String(params.id)) ?? []);
+  }),
+  http.post(`${apiRoutes.conversations}/:id/messages`, async ({ params, request }) => {
+    const conversationId = String(params.id);
+    const payload = (await request.json()) as { content?: string };
+    const question = payload.content?.trim() || '请给出环境执法建议。';
+    const answer = conversationAnswer(question);
+    const now = new Date().toISOString();
+    const userMessage: MockMessage = {
+      id: nextId('user'),
+      role: 'user',
+      content: question,
+      createdAt: now
+    };
+    const assistantMessage: MockMessage = {
+      id: nextId('assistant'),
+      role: 'assistant',
+      content: answer.text,
+      createdAt: new Date(Date.now() + 1000).toISOString(),
+      sources: answer.sources
+    };
+
+    const currentMessages = conversationMessages.get(conversationId) ?? [];
+    conversationMessages.set(conversationId, [...currentMessages, userMessage, assistantMessage]);
+
+    conversations = conversations
+      .map((item) =>
+        item.id === conversationId
+          ? {
+              ...item,
+              title: item.title === '新建会话' ? question.slice(0, 18) : item.title,
+              updatedAt: now
+            }
+          : item
+      )
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    const deltas = [
+      answer.text.slice(0, 34),
+      answer.text.slice(34, 76),
+      answer.text.slice(76)
+    ].filter(Boolean);
+
+    const stream = createEventStream([
+      { delayMs: 120, chunk: `event: delta\ndata: ${JSON.stringify({ delta: deltas[0] })}\n\n` },
+      { delayMs: 220, chunk: `event: delta\ndata: ${JSON.stringify({ delta: deltas[1] ?? '' })}\n\n` },
+      { delayMs: 180, chunk: `event: sources\ndata: ${JSON.stringify({ sources: answer.sources })}\n\n` },
+      { delayMs: 220, chunk: `event: delta\ndata: ${JSON.stringify({ delta: deltas[2] ?? '' })}\n\n` },
+      { delayMs: 80, chunk: 'event: done\ndata: {"done":true}\n\n' }
+    ]);
+
+    return new HttpResponse(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      }
+    });
+  }),
+  http.get(apiRoutes.workspaces.dashboard, async () => {
     await delay(200);
     return success(dashboard);
   }),
-  http.get('/api/mock/chat', async () => {
+  http.get(apiRoutes.workspaces.chat, async () => {
     await delay(220);
-    return success(chatWorkspace);
+    return success(buildChatWorkspace());
   }),
-  http.get('/api/mock/knowledge', async () => {
-    await delay(260);
-    return success(knowledgeWorkspace);
+  http.get(apiRoutes.workspaces.knowledge, async () => {
+    await delay(220);
+    return success(buildKnowledgeWorkspace());
   }),
-  http.get('/api/mock/source', async () => {
+  http.get(apiRoutes.workspaces.source, async () => {
     await delay(200);
     return success(sourceWorkspace);
   }),
-  http.get('/api/mock/agent', async () => {
+  http.get(apiRoutes.workspaces.agent, async () => {
     await delay(230);
     return success(agentWorkspace);
   }),
-  http.get('/api/mock/monitor', async () => {
+  http.get(apiRoutes.workspaces.monitor, async () => {
     await delay(220);
     return success(monitorWorkspace);
   }),
-  http.get('/api/mock/users', async () => {
+  http.get(apiRoutes.workspaces.users, async () => {
     await delay(200);
     return success(usersWorkspace);
   })

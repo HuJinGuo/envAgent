@@ -6,6 +6,9 @@ spring:
     active: dev
   application:
     name: env-agent-backend
+  sql:
+    init:
+      mode: always
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/env_agent_ai}
     username: ${DB_USERNAME:openclaw}
@@ -37,6 +40,8 @@ app:
   vector:
     dimensions: ${VECTOR_DIMENSIONS:1536}
     similarity-threshold: ${VECTOR_SIMILARITY_THRESHOLD:0.65}
+  storage:
+    base-path: ${APP_STORAGE_BASE_PATH:./data}
   jwt:
     secret: ${JWT_SECRET:ZW52LWFnZW50LWJhY2tlbmQtc2VjcmV0LWZvci1kZXYtdGVzdC0xMjM0NTY3ODkw}
     expiration-seconds: ${JWT_EXPIRATION_SECONDS:28800}

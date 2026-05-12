@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -26,20 +26,36 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
+  apiRoutes,
+  createConversation,
+  fetchConversationMessages,
+  fetchConversations,
+  fetchDocumentStatus,
+  fetchDocuments,
+  fetchKnowledgeBases,
   fetchAgentWorkspace,
   fetchChatWorkspace,
   fetchCurrentUser,
   fetchDashboardSnapshot,
+  fetchDocumentDetail,
   fetchKnowledgeWorkspace,
   fetchMonitorWorkspace,
   fetchSourceWorkspace,
   fetchSystemHealth,
   fetchUsersWorkspace,
+  isMockApiMode,
   login,
+  renameConversation,
+  streamConversationMessage,
+  uploadDocuments,
   type AgentWorkspace,
   type ChatWorkspace,
+  type ConversationMessage,
+  type ConversationRecord,
   type DashboardSnapshot,
   type EnterpriseRecord,
+  type KnowledgeBase,
+  type KnowledgeDocument,
   type KnowledgeWorkspace,
   type LoginRequest,
   type MonitorWorkspace,
@@ -75,7 +91,7 @@ const pageMeta: Record<
   kb: {
     label: '知识库',
     title: '知识库管理与上传',
-    description: '围绕文档上传、切片、向量化与状态跟踪组织页面，真实上传接口落地前由 MSW 托管。',
+    description: '围绕文档上传、切片、向量化与状态跟踪组织页面，保持与真实后端文档链路的接口边界一致。',
     icon: Database
   },
   source: {
@@ -105,8 +121,23 @@ const pageMeta: Record<
 };
 
 const navItems: WorkspaceSection[] = ['dash', 'chat', 'kb', 'source', 'agent', 'monitor', 'users'];
+
+const sectionRoles: Record<WorkspaceSection, Array<'INSPECTOR' | 'ANALYST' | 'ADMIN'>> = {
+  dash: ['INSPECTOR', 'ANALYST', 'ADMIN'],
+  chat: ['INSPECTOR', 'ANALYST', 'ADMIN'],
+  kb: ['ANALYST', 'ADMIN'],
+  source: ['INSPECTOR', 'ANALYST', 'ADMIN'],
+  agent: ['ANALYST', 'ADMIN'],
+  monitor: ['ADMIN'],
+  users: ['ADMIN']
+};
+
 function isWorkspaceSection(value: string): value is WorkspaceSection {
   return value in pageMeta;
+}
+
+function canAccessSection(section: WorkspaceSection, role?: string | null) {
+  return !role || sectionRoles[section].includes(role as 'INSPECTOR' | 'ANALYST' | 'ADMIN');
 }
 
 function App() {
@@ -122,12 +153,13 @@ function App() {
   const setCredential = useSessionStore((state) => state.setCredential);
   const [isSwitching, startTransition] = useTransition();
   const [chatSearch, setChatSearch] = useState('');
-  const deferredChatSearch = useDeferredValue(chatSearch);
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [enterpriseId, setEnterpriseId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  const isMockMode = (import.meta.env.VITE_API_MODE ?? 'mock') !== 'real';
+  const isMockMode = isMockApiMode();
+  const hasSession = Boolean(token);
+  const sessionRole = storedUser?.role ?? null;
 
   const healthQuery = useQuery({
     queryKey: ['system-health'],
@@ -138,51 +170,78 @@ function App() {
   const meQuery = useQuery({
     queryKey: ['current-user', token],
     queryFn: fetchCurrentUser,
-    enabled: Boolean(token),
+    enabled: hasSession,
     retry: false
   });
 
   const dashboardQuery = useQuery({
-    queryKey: ['workspace-dashboard'],
+    queryKey: ['workspace-dashboard', token],
     queryFn: fetchDashboardSnapshot,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession
   });
 
   const chatQuery = useQuery({
-    queryKey: ['workspace-chat'],
+    queryKey: ['workspace-chat', token],
     queryFn: fetchChatWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession
   });
 
   const knowledgeQuery = useQuery({
-    queryKey: ['workspace-knowledge'],
+    queryKey: ['workspace-knowledge', token],
     queryFn: fetchKnowledgeWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession && canAccessSection('kb', sessionRole)
   });
 
   const sourceQuery = useQuery({
-    queryKey: ['workspace-source'],
+    queryKey: ['workspace-source', token],
     queryFn: fetchSourceWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession
   });
 
   const agentQuery = useQuery({
-    queryKey: ['workspace-agent'],
+    queryKey: ['workspace-agent', token],
     queryFn: fetchAgentWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession && canAccessSection('agent', sessionRole)
   });
 
   const monitorQuery = useQuery({
-    queryKey: ['workspace-monitor'],
+    queryKey: ['workspace-monitor', token],
     queryFn: fetchMonitorWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession && canAccessSection('monitor', sessionRole)
   });
 
   const usersQuery = useQuery({
-    queryKey: ['workspace-users'],
+    queryKey: ['workspace-users', token],
     queryFn: fetchUsersWorkspace,
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: hasSession && canAccessSection('users', sessionRole)
   });
+
+  const activeUser = meQuery.data?.data ?? storedUser;
+  const activeRole = activeUser?.role ?? null;
+  const activeSection = isWorkspaceSection(selectedSection) ? selectedSection : 'dash';
+  const visibleNavItems = navItems.filter((item) => canAccessSection(item, activeRole));
+
+  const clearProtectedQueries = () => {
+    queryClient.removeQueries({ queryKey: ['current-user'] });
+    queryClient.removeQueries({ queryKey: ['workspace-dashboard'] });
+    queryClient.removeQueries({ queryKey: ['workspace-chat'] });
+    queryClient.removeQueries({ queryKey: ['workspace-knowledge'] });
+    queryClient.removeQueries({ queryKey: ['workspace-source'] });
+    queryClient.removeQueries({ queryKey: ['workspace-agent'] });
+    queryClient.removeQueries({ queryKey: ['workspace-monitor'] });
+    queryClient.removeQueries({ queryKey: ['workspace-users'] });
+    queryClient.removeQueries({ queryKey: ['conversations'] });
+    queryClient.removeQueries({ queryKey: ['conversation-messages'] });
+    queryClient.removeQueries({ queryKey: ['knowledge-bases'] });
+    queryClient.removeQueries({ queryKey: ['documents'] });
+  };
 
   useEffect(() => {
     if (meQuery.data?.data) {
@@ -192,15 +251,24 @@ function App() {
 
   useEffect(() => {
     if (meQuery.error instanceof ApiError && meQuery.error.status === 401) {
+      clearProtectedQueries();
       clearSession();
     }
-  }, [clearSession, meQuery.error]);
+  }, [clearProtectedQueries, clearSession, meQuery.error]);
 
   useEffect(() => {
-    if (!chatSessionId && chatQuery.data?.data.sessions.length) {
-      setChatSessionId(chatQuery.data.data.sessions[0].id);
+    if (!hasSession) {
+      setChatSessionId(null);
+      setEnterpriseId(null);
+      setUserId(null);
     }
-  }, [chatQuery.data, chatSessionId]);
+  }, [hasSession]);
+
+  useEffect(() => {
+    if (!canAccessSection(activeSection, activeRole) && visibleNavItems.length) {
+      setSelectedSection(visibleNavItems[0]);
+    }
+  }, [activeRole, activeSection, setSelectedSection, visibleNavItems]);
 
   useEffect(() => {
     if (!enterpriseId && sourceQuery.data?.data.enterprises.length) {
@@ -219,22 +287,16 @@ function App() {
     onSuccess: (response) => {
       setSession(response.data);
       void queryClient.invalidateQueries({ queryKey: ['current-user'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-chat'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-knowledge'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-source'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-agent'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-monitor'] });
+      void queryClient.invalidateQueries({ queryKey: ['workspace-users'] });
     }
   });
-
-  const activeUser = meQuery.data?.data ?? storedUser;
-  const activeSection = isWorkspaceSection(selectedSection) ? selectedSection : 'dash';
   const meta = pageMeta[activeSection];
-
-  const filteredSessions = useMemo(() => {
-    const sessions = chatQuery.data?.data.sessions ?? [];
-    const keyword = deferredChatSearch.trim().toLowerCase();
-    if (!keyword) {
-      return sessions;
-    }
-
-    return sessions.filter((item) => item.title.toLowerCase().includes(keyword));
-  }, [chatQuery.data, deferredChatSearch]);
 
   const selectedEnterprise = useMemo(() => {
     const enterprises = sourceQuery.data?.data.enterprises ?? [];
@@ -245,6 +307,11 @@ function App() {
     const users = usersQuery.data?.data.users ?? [];
     return users.find((item) => item.id === userId) ?? users[0] ?? null;
   }, [userId, usersQuery.data]);
+
+  const handleLogout = () => {
+    clearSession();
+    clearProtectedQueries();
+  };
 
   return (
     <div className="app-shell">
@@ -265,7 +332,7 @@ function App() {
             </div>
 
             <nav className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2">
-              {navItems.map((id) => {
+              {visibleNavItems.map((id) => {
                 const item = pageMeta[id];
                 const Icon = item.icon;
                 const active = activeSection === id;
@@ -302,13 +369,15 @@ function App() {
             </nav>
           </div>
 
-          <div className="mt-5 hidden space-y-3 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 md:mt-auto md:block">
+          <div className="mt-5 space-y-3 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 md:mt-auto">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-[0.22em] text-white/40">Runtime</span>
-              <Badge tone={isMockMode ? 'warn' : 'good'}>{isMockMode ? 'MSW Mock' : 'Live API'}</Badge>
+              <Badge tone={isMockMode ? 'warn' : 'good'}>{isMockMode ? 'Mock API' : 'Real API'}</Badge>
             </div>
             <p className="text-sm leading-6 text-white/60">
-              真实后端目前确认了 `health / login / me`。其它业务页按照文档原型继续推进，并等待接口补齐后直接替换。
+              {isMockMode
+                ? '当前显式启用 MSW，接口路径仍保持与 Spring Boot 一致，便于随时切回真实后端。'
+                : `默认直连 Spring Boot。健康检查读取 ${apiRoutes.systemHealth}，登录后工作区请求 /api/v1/workspaces/*。`}
             </p>
             {activeUser ? (
               <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
@@ -317,7 +386,7 @@ function App() {
                     <div className="text-sm font-semibold text-white">{activeUser.username}</div>
                     <div className="text-xs text-white/55">{activeUser.role}</div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => clearSession()}>
+                  <Button variant="ghost" size="sm" onClick={handleLogout}>
                     <LogOut className="h-4 w-4" />
                     退出
                   </Button>
@@ -395,7 +464,15 @@ function App() {
         </header>
 
         <div className="space-y-5 px-5 py-5 md:px-8 md:py-7">
-          {activeSection === 'dash' ? (
+          {!hasSession ? (
+            <EmptyState
+              icon={ShieldCheck}
+              title="请先登录"
+              description={`业务工作区已切换到真实后端接口。完成认证后将按角色加载 /api/v1/workspaces/*，健康检查仍走 ${apiRoutes.systemHealth}。`}
+            />
+          ) : null}
+
+          {hasSession && activeSection === 'dash' ? (
             <DashboardPage
               dashboard={dashboardQuery.data?.data}
               dashboardLoading={dashboardQuery.isLoading}
@@ -410,12 +487,11 @@ function App() {
             />
           ) : null}
 
-          {activeSection === 'chat' ? (
+          {hasSession && activeSection === 'chat' ? (
             <ChatPage
-              data={chatQuery.data?.data}
-              isLoading={chatQuery.isLoading}
-              error={chatQuery.error}
-              sessions={filteredSessions}
+              workspace={chatQuery.data?.data}
+              workspaceLoading={chatQuery.isLoading}
+              workspaceError={chatQuery.error}
               search={chatSearch}
               onSearch={setChatSearch}
               sessionId={chatSessionId}
@@ -423,7 +499,7 @@ function App() {
             />
           ) : null}
 
-          {activeSection === 'kb' ? (
+          {hasSession && activeSection === 'kb' ? (
             <KnowledgePage
               data={knowledgeQuery.data?.data}
               isLoading={knowledgeQuery.isLoading}
@@ -431,7 +507,7 @@ function App() {
             />
           ) : null}
 
-          {activeSection === 'source' ? (
+          {hasSession && activeSection === 'source' ? (
             <SourcePage
               data={sourceQuery.data?.data}
               isLoading={sourceQuery.isLoading}
@@ -441,11 +517,11 @@ function App() {
             />
           ) : null}
 
-          {activeSection === 'agent' ? (
+          {hasSession && activeSection === 'agent' ? (
             <AgentPage data={agentQuery.data?.data} isLoading={agentQuery.isLoading} error={agentQuery.error} />
           ) : null}
 
-          {activeSection === 'monitor' ? (
+          {hasSession && activeSection === 'monitor' ? (
             <MonitorPage
               data={monitorQuery.data?.data}
               isLoading={monitorQuery.isLoading}
@@ -454,7 +530,7 @@ function App() {
             />
           ) : null}
 
-          {activeSection === 'users' ? (
+          {hasSession && activeSection === 'users' ? (
             <UsersPage
               data={usersQuery.data?.data}
               isLoading={usersQuery.isLoading}
@@ -612,134 +688,513 @@ function DashboardPage(props: {
 }
 
 function ChatPage(props: {
-  data?: ChatWorkspace;
-  isLoading: boolean;
-  error: unknown;
-  sessions: ChatWorkspace['sessions'];
+  workspace?: ChatWorkspace;
+  workspaceLoading: boolean;
+  workspaceError: unknown;
   search: string;
   onSearch: (value: string) => void;
   sessionId: string | null;
-  onSessionChange: (id: string) => void;
+  onSessionChange: (id: string | null) => void;
 }) {
-  if (props.isLoading) {
+  const queryClient = useQueryClient();
+  const deferredSearch = useDeferredValue(props.search);
+  const abortRef = useRef<AbortController | null>(null);
+  const [draft, setDraft] = useState('');
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [references, setReferences] = useState<ChatWorkspace['references']>(props.workspace?.references ?? []);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  const conversationsQuery = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations
+  });
+
+  const messagesQuery = useQuery({
+    queryKey: ['conversation-messages', props.sessionId],
+    queryFn: () => fetchConversationMessages(props.sessionId!),
+    enabled: Boolean(props.sessionId)
+  });
+
+  const upsertConversationCache = (conversation: ConversationRecord) => {
+    queryClient.setQueryData(
+      ['conversations'],
+      (
+        current:
+          | {
+              code?: number;
+              msg?: string;
+              data?: ConversationRecord[];
+            }
+          | undefined
+      ) => {
+        const nextData = [
+          conversation,
+          ...(current?.data ?? []).filter((item) => item.id !== conversation.id)
+        ];
+
+        return current
+          ? {
+              ...current,
+              data: nextData
+            }
+          : {
+              code: 0,
+              msg: 'ok',
+              data: nextData
+            };
+      }
+    );
+  };
+
+  const createConversationMutation = useMutation({
+    mutationFn: () => createConversation({ title: '新建会话' }),
+    onSuccess: (response) => {
+      upsertConversationCache(response.data);
+      props.onSessionChange(response.data.id);
+      setMessages([]);
+      setReferences([]);
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  });
+
+  const renameConversationMutation = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => renameConversation(id, { title }),
+    onSuccess: (response) => {
+      upsertConversationCache(response.data);
+      setRenameDraft(response.data.title);
+      setIsRenaming(false);
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  });
+
+  const sessions = useMemo(() => {
+    const source = conversationsQuery.data?.data ?? [];
+    const keyword = deferredSearch.trim().toLowerCase();
+    if (!keyword) {
+      return source;
+    }
+
+    return source.filter((item) => item.title.toLowerCase().includes(keyword));
+  }, [conversationsQuery.data, deferredSearch]);
+
+  const selectedConversation = useMemo(() => {
+    const allSessions = conversationsQuery.data?.data ?? [];
+    return allSessions.find((item) => item.id === props.sessionId) ?? null;
+  }, [conversationsQuery.data, props.sessionId]);
+
+  useEffect(() => {
+    const allSessions = conversationsQuery.data?.data ?? [];
+    if (!allSessions.length) {
+      if (props.sessionId) {
+        props.onSessionChange(null);
+      }
+      return;
+    }
+
+    if (!props.sessionId) {
+      props.onSessionChange(allSessions[0].id);
+      return;
+    }
+
+    if (!allSessions.some((item) => item.id === props.sessionId)) {
+      props.onSessionChange(allSessions[0].id);
+    }
+  }, [conversationsQuery.data, props.onSessionChange, props.sessionId]);
+
+  useEffect(() => {
+    setIsRenaming(false);
+    setRenameDraft(selectedConversation?.title ?? '');
+  }, [selectedConversation?.id]);
+
+  useEffect(() => {
+    if (!isRenaming && selectedConversation) {
+      setRenameDraft(selectedConversation.title);
+    }
+  }, [isRenaming, selectedConversation]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      return;
+    }
+
+    if (!props.sessionId) {
+      setMessages([]);
+      setReferences(props.workspace?.references ?? []);
+      return;
+    }
+
+    const nextMessages = messagesQuery.data?.data ?? [];
+    setMessages(nextMessages);
+    const nextReferences = getLatestReferences(nextMessages);
+    setReferences(nextReferences.length ? nextReferences : (props.workspace?.references ?? []));
+  }, [isStreaming, messagesQuery.data, props.sessionId, props.workspace]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const sendMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const question = content.trim();
+      if (!question) {
+        return;
+      }
+
+      const createdConversation = props.sessionId
+        ? null
+        : await createConversation({ title: question.slice(0, 18) || '新建会话' });
+      const conversationId = props.sessionId ?? createdConversation!.data.id;
+
+      if (createdConversation) {
+        upsertConversationCache(createdConversation.data);
+      }
+
+      if (!props.sessionId) {
+        props.onSessionChange(conversationId);
+      }
+
+      const userMessageId = `local-user-${Date.now()}`;
+      const assistantMessageId = `local-assistant-${Date.now()}`;
+
+      setMessages((current) =>
+        conversationId === props.sessionId
+          ? [
+              ...current,
+              { id: userMessageId, role: 'user', content: question },
+              { id: assistantMessageId, role: 'assistant', content: '', citations: [] }
+            ]
+          : [
+              { id: userMessageId, role: 'user', content: question },
+              { id: assistantMessageId, role: 'assistant', content: '', citations: [] }
+            ]
+      );
+      setReferences([]);
+      setIsStreaming(true);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        await streamConversationMessage(
+          conversationId,
+          { content: question },
+          {
+            onDelta: (delta) => {
+              setMessages((current) =>
+                current.map((item) =>
+                  item.id === assistantMessageId
+                    ? {
+                        ...item,
+                        content: `${item.content}${delta}`
+                      }
+                    : item
+                )
+              );
+            },
+            onSources: (nextSources) => {
+              setReferences(nextSources);
+              setMessages((current) =>
+                current.map((item) =>
+                  item.id === assistantMessageId
+                    ? {
+                        ...item,
+                        citations: nextSources.map((source) => source.title),
+                        sources: nextSources
+                      }
+                    : item
+                )
+              );
+            },
+            onDone: () => {
+              setIsStreaming(false);
+            }
+          },
+          controller.signal
+        );
+      } catch (error) {
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === assistantMessageId
+              ? {
+                  ...item,
+                  content: item.content || `请求失败：${getErrorMessage(error)}`
+                }
+              : item
+          )
+        );
+        setIsStreaming(false);
+        throw error;
+      } finally {
+        abortRef.current = null;
+        setIsStreaming(false);
+        await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        await queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] });
+      }
+    }
+  });
+
+  const isInitialLoading =
+    conversationsQuery.isLoading || (props.workspaceLoading && !props.workspace && !conversationsQuery.data);
+
+  const submitRename = () => {
+    const title = renameDraft.trim();
+    if (!selectedConversation || !title || title === selectedConversation.title) {
+      setIsRenaming(false);
+      setRenameDraft(selectedConversation?.title ?? '');
+      return;
+    }
+
+    renameConversationMutation.mutate({ id: selectedConversation.id, title });
+  };
+
+  if (isInitialLoading) {
     return <PageSkeleton blocks={7} />;
   }
 
-  if (props.error) {
-    return <EmptyState icon={MessageSquareText} title="问答工作区加载失败" description={getErrorMessage(props.error)} />;
-  }
-
-  if (!props.data) {
-    return null;
+  if (conversationsQuery.error && !(conversationsQuery.data?.data?.length ?? 0)) {
+    return <EmptyState icon={MessageSquareText} title="会话列表加载失败" description={getErrorMessage(conversationsQuery.error)} />;
   }
 
   return (
     <div className="grid gap-5 xl:grid-cols-[250px_minmax(0,1fr)_260px]">
-      <Panel title="会话列表" description="按今天 / 昨天 / 更早组织，延续文档原型的左侧会话结构。">
+      <Panel
+        title="会话列表"
+        description="会话列表已改成真实 conversations 查询，搜索、新建和重命名都直接作用于接口。"
+      >
         <div className="space-y-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
             <Input className="pl-11" value={props.search} onChange={(event) => props.onSearch(event.target.value)} placeholder="搜索会话" />
           </div>
-          <Button className="w-full" variant="secondary">
+          {selectedConversation ? (
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-[0.16em] text-white/36">当前会话</div>
+                  <div className="mt-1 truncate text-sm text-white">{selectedConversation.title}</div>
+                </div>
+                {!isRenaming ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={isStreaming || renameConversationMutation.isPending}
+                    onClick={() => {
+                      setRenameDraft(selectedConversation.title);
+                      setIsRenaming(true);
+                    }}
+                  >
+                    重命名
+                  </Button>
+                ) : null}
+              </div>
+              {isRenaming ? (
+                <div className="mt-3 flex gap-2">
+                  <Input
+                    value={renameDraft}
+                    maxLength={255}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                        event.preventDefault();
+                        submitRename();
+                      }
+
+                      if (event.key === 'Escape') {
+                        setIsRenaming(false);
+                        setRenameDraft(selectedConversation.title);
+                      }
+                    }}
+                    placeholder="输入新的会话标题"
+                  />
+                  <Button size="sm" disabled={!renameDraft.trim() || renameConversationMutation.isPending} onClick={submitRename}>
+                    {renameConversationMutation.isPending ? '保存中...' : '保存'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={renameConversationMutation.isPending}
+                    onClick={() => {
+                      setIsRenaming(false);
+                      setRenameDraft(selectedConversation.title);
+                    }}
+                  >
+                    取消
+                  </Button>
+                </div>
+              ) : null}
+              {renameConversationMutation.error ? (
+                <div className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+                  {getErrorMessage(renameConversationMutation.error)}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <Button
+            className="w-full"
+            variant="secondary"
+            disabled={createConversationMutation.isPending || isStreaming || renameConversationMutation.isPending}
+            onClick={() => createConversationMutation.mutate()}
+          >
             <MessageSquareText className="h-4 w-4" />
-            新建会话
+            {createConversationMutation.isPending ? '创建中...' : '新建会话'}
           </Button>
+          {(createConversationMutation.error || conversationsQuery.error) && !sessions.length ? (
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+              {getErrorMessage(createConversationMutation.error ?? conversationsQuery.error)}
+            </div>
+          ) : null}
           <div className="space-y-2">
-            {props.sessions.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => props.onSessionChange(item.id)}
-                className={cn(
-                  'w-full rounded-2xl border px-4 py-3 text-left transition',
-                  props.sessionId === item.id
-                    ? 'border-[#d7ff64]/45 bg-[#d7ff64]/10'
-                    : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.05]'
-                )}
-              >
-                <div className="text-xs uppercase tracking-[0.18em] text-white/38">{item.group}</div>
-                <div className="mt-2 text-sm font-medium text-white">{item.title}</div>
-                <div className="mt-2 text-xs text-white/45">{item.updatedAt}</div>
-              </button>
-            ))}
+            {sessions.length ? (
+              sessions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => props.onSessionChange(item.id)}
+                  className={cn(
+                    'w-full rounded-2xl border px-4 py-3 text-left transition',
+                    props.sessionId === item.id
+                      ? 'border-[#d7ff64]/45 bg-[#d7ff64]/10'
+                      : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.05]'
+                  )}
+                >
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/38">{item.group}</div>
+                  <div className="mt-2 text-sm font-medium text-white">{item.title}</div>
+                  <div className="mt-2 text-xs text-white/45">{item.updatedAt}</div>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/50">
+                暂无会话，点击上方按钮创建新会话。
+              </div>
+            )}
           </div>
         </div>
       </Panel>
 
-      <Panel title="AI 智能问答" description="消息区、引用标注和输入面板拆开，后续接 SSE 时改动面最小。">
+      <Panel title="AI 智能问答" description="消息区已接入真实消息列表与 SSE 流式回答，来源事件同步右侧引用面板。">
         <div className="flex min-h-[620px] flex-col">
           <div className="flex flex-wrap gap-2">
-            {props.data.scopes.map((scope) => (
+            {(props.workspace?.scopes ?? []).map((scope) => (
               <Badge key={scope.id} tone={scope.enabled ? 'good' : 'neutral'}>
                 {scope.label}
               </Badge>
             ))}
           </div>
 
+          {messagesQuery.error && props.sessionId ? (
+            <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+              {getErrorMessage(messagesQuery.error)}
+            </div>
+          ) : null}
+
           <div className="mt-5 flex-1 space-y-4">
-            {props.data.messages.map((message) => (
-              <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                <div
-                  className={cn(
-                    'max-w-[76%] rounded-[24px] px-5 py-4 text-sm leading-7',
-                    message.role === 'user'
-                      ? 'bg-[#1f6fb6] text-white'
-                      : 'border border-white/10 bg-white/[0.03] text-white'
-                  )}
-                >
-                  <div>{message.content}</div>
-                  {message.citations?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {message.citations.map((cite) => (
-                        <span key={cite} className="rounded-full border border-[#8ed3ff]/30 bg-[#0f314a] px-3 py-1 text-xs text-[#b6e4ff]">
-                          {cite}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+            {messagesQuery.isLoading && props.sessionId && !messages.length ? (
+              <PageSkeleton blocks={2} />
+            ) : messages.length ? (
+              messages.map((message) => (
+                <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                  <div
+                    className={cn(
+                      'max-w-[76%] rounded-[24px] px-5 py-4 text-sm leading-7',
+                      message.role === 'user'
+                        ? 'bg-[#1f6fb6] text-white'
+                        : 'border border-white/10 bg-white/[0.03] text-white'
+                    )}
+                  >
+                    <div>{message.content || (isStreaming && message.role === 'assistant' ? '...' : '暂无内容')}</div>
+                    {message.citations?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {message.citations.map((cite) => (
+                          <span key={`${message.id}-${cite}`} className="rounded-full border border-[#8ed3ff]/30 bg-[#0f314a] px-3 py-1 text-xs text-[#b6e4ff]">
+                            {cite}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="flex h-full min-h-[320px] items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.02] px-6 text-center text-sm leading-7 text-white/48">
+                选择一个会话后即可加载消息；没有会话时可以直接新建并发送问题。
               </div>
-            ))}
+            )}
           </div>
 
           <div className="mt-5 rounded-[28px] border border-white/10 bg-black/15 p-4">
             <div className="flex flex-wrap gap-2">
-              {props.data.suggestions.map((item) => (
-                <button key={item} type="button" className="rounded-full border border-white/12 px-3 py-1 text-sm text-white/60 transition hover:border-white/25 hover:text-white">
+              {(props.workspace?.suggestions ?? []).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setDraft(item)}
+                  className="rounded-full border border-white/12 px-3 py-1 text-sm text-white/60 transition hover:border-white/25 hover:text-white"
+                >
                   {item}
                 </button>
               ))}
             </div>
+            {sendMutation.error ? (
+              <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+                {getErrorMessage(sendMutation.error)}
+              </div>
+            ) : null}
             <div className="mt-4 flex gap-3">
               <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && draft.trim() && !sendMutation.isPending) {
+                    event.preventDefault();
+                    setDraft('');
+                    sendMutation.mutate(draft);
+                  }
+                }}
                 className="min-h-[108px] flex-1 rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none"
-                placeholder="输入问题，后续这里将接入真实 SSE 流式问答。"
+                placeholder="输入问题，发送后会消费 /api/v1/conversations/{id}/messages 的流式事件。"
               />
-              <Button className="self-end px-5">
+              <Button
+                className="self-end px-5"
+                disabled={!draft.trim() || sendMutation.isPending}
+                onClick={() => {
+                  const nextDraft = draft;
+                  setDraft('');
+                  sendMutation.mutate(nextDraft);
+                }}
+              >
                 <SendHorizontal className="h-4 w-4" />
-                发送
+                {sendMutation.isPending ? '发送中...' : '发送'}
               </Button>
             </div>
           </div>
         </div>
       </Panel>
 
-      <Panel title="来源引用" description="单独维持一个引用侧栏，匹配二期里“引用来源面板”的要求。">
+      <Panel title="来源引用" description="右侧面板优先展示 SSE `sources` 事件，历史消息若带来源也会同步恢复。">
         <div className="space-y-3">
-          {props.data.references.map((item) => (
-            <div key={item.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm font-semibold text-white">{item.title}</div>
-              <div className="mt-2 text-sm leading-6 text-white/58">{item.excerpt}</div>
-              <div className="mt-3 flex items-center justify-between text-xs text-white/42">
-                <span>{item.source}</span>
-                <span>{Math.round(item.score * 100)}%</span>
+          {references.length ? (
+            references.map((item) => (
+              <div key={item.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <div className="mt-2 text-sm leading-6 text-white/58">{item.excerpt || '当前来源未返回摘录。'}</div>
+                <div className="mt-3 flex items-center justify-between text-xs text-white/42">
+                  <span>{item.source}</span>
+                  <span>{Math.round(item.score * 100)}%</span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-white/10">
+                  <div className="h-1.5 rounded-full bg-[#4cc3ff]" style={{ width: `${Math.max(8, Math.round(item.score * 100))}%` }} />
+                </div>
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-white/10">
-                <div className="h-1.5 rounded-full bg-[#4cc3ff]" style={{ width: `${Math.round(item.score * 100)}%` }} />
-              </div>
+            ))
+          ) : (
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm leading-7 text-white/48">
+              当前还没有引用来源。发送问题后如果流中返回 `sources` 事件，这里会即时更新。
             </div>
-          ))}
+          )}
         </div>
       </Panel>
     </div>
@@ -747,35 +1202,213 @@ function ChatPage(props: {
 }
 
 function KnowledgePage(props: { data?: KnowledgeWorkspace; isLoading: boolean; error: unknown }) {
-  if (props.isLoading) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedKnowledgeBaseId, setSelectedKnowledgeBaseId] = useState<string>('all');
+
+  const knowledgeBasesQuery = useQuery({
+    queryKey: ['knowledge-bases'],
+    queryFn: fetchKnowledgeBases
+  });
+
+  const documentsQuery = useQuery({
+    queryKey: ['documents', selectedKnowledgeBaseId],
+    queryFn: () =>
+      fetchDocuments(
+        selectedKnowledgeBaseId === 'all'
+          ? undefined
+          : {
+              knowledgeBaseId: selectedKnowledgeBaseId
+            }
+      )
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (files: File[]) =>
+      uploadDocuments({
+        files,
+        knowledgeBaseId: selectedKnowledgeBaseId === 'all' ? undefined : selectedKnowledgeBaseId
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['documents'] });
+      await queryClient.invalidateQueries({ queryKey: ['knowledge-bases'] });
+      await queryClient.invalidateQueries({ queryKey: ['workspace-knowledge'] });
+      await queryClient.invalidateQueries({ queryKey: ['workspace-dashboard'] });
+    }
+  });
+
+  const allDocuments = documentsQuery.data?.data ?? props.data?.documents ?? [];
+  const documents = useMemo(() => {
+    if (selectedKnowledgeBaseId === 'all') {
+      return allDocuments;
+    }
+
+    return allDocuments.filter(
+      (item) =>
+        item.knowledgeBaseId === selectedKnowledgeBaseId ||
+        item.knowledgeBaseName === selectedKnowledgeBaseId ||
+        item.category === selectedKnowledgeBaseId
+    );
+  }, [allDocuments, selectedKnowledgeBaseId]);
+  const pendingDocuments = useMemo(() => documents.filter((item) => !item.isTerminal), [documents]);
+
+  useEffect(() => {
+    if (!pendingDocuments.length) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void Promise.all(
+        pendingDocuments.map(async (document) => {
+          try {
+            return (await fetchDocumentStatus(document.id)).data;
+          } catch {
+            try {
+              return (await fetchDocumentDetail(document.id)).data;
+            } catch {
+              return null;
+            }
+          }
+        })
+      ).then((updates) => {
+        const availableUpdates = updates.filter((item): item is KnowledgeDocument => Boolean(item));
+        if (!availableUpdates.length) {
+          void queryClient.invalidateQueries({ queryKey: ['documents', selectedKnowledgeBaseId] });
+          return;
+        }
+
+        queryClient.setQueryData(['documents', selectedKnowledgeBaseId], (current: { data?: KnowledgeDocument[] } | undefined) => {
+          if (!current?.data) {
+            return current;
+          }
+
+          return {
+            ...current,
+            data: current.data.map((item) => {
+              const candidate = availableUpdates.find((next) => next.id === item.id);
+              return candidate
+                ? {
+                    ...item,
+                    status: candidate.status,
+                    statusLabel: candidate.statusLabel,
+                    isTerminal: candidate.isTerminal,
+                    chunks: candidate.chunks || item.chunks,
+                    updatedAt: candidate.updatedAt || item.updatedAt
+                  }
+                : item;
+            })
+          };
+        });
+
+        if (availableUpdates.some((item) => item.isTerminal)) {
+          void queryClient.invalidateQueries({ queryKey: ['documents'] });
+          void queryClient.invalidateQueries({ queryKey: ['knowledge-bases'] });
+          void queryClient.invalidateQueries({ queryKey: ['workspace-dashboard'] });
+        }
+      });
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [pendingDocuments, queryClient, selectedKnowledgeBaseId]);
+
+  const categoryBadges = useMemo(() => {
+    const knowledgeBases = knowledgeBasesQuery.data?.data ?? [];
+    if (knowledgeBases.length) {
+      return [
+        {
+          id: 'all',
+          label: '全部',
+          count: knowledgeBases.reduce((sum, item) => sum + item.documentCount, 0)
+        },
+        ...knowledgeBases.map((item) => ({
+          id: item.id,
+          label: item.name,
+          count: item.documentCount
+        }))
+      ];
+    }
+
+    const counts = new Map<string, number>();
+    documents.forEach((item) => {
+      const key = item.knowledgeBaseName || item.category || '未分类';
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+
+    return [
+      { id: 'all', label: '全部', count: documents.length },
+      ...Array.from(counts.entries()).map(([label, count]) => ({
+        id: label,
+        label,
+        count
+      }))
+    ];
+  }, [documents, knowledgeBasesQuery.data]);
+
+  const summaryCards = useMemo(() => {
+    if (!documentsQuery.data?.data) {
+      return props.data?.summary ?? [];
+    }
+
+    const totalDocuments = documents.length;
+    const processing = documents.filter((item) => !item.isTerminal).length;
+    const totalChunks = documents.reduce((sum, item) => sum + item.chunks, 0);
+
+    return [
+      {
+        id: 'documents-total',
+        label: '知识库总量',
+        value: `${totalDocuments} 份`,
+        note: '实时来自 documents 列表'
+      },
+      {
+        id: 'documents-processing',
+        label: '解析队列',
+        value: `${processing} 份`,
+        note: processing ? '轮询 document status 中' : '当前没有进行中文档'
+      },
+      {
+        id: 'documents-chunks',
+        label: '向量切片',
+        value: `${totalChunks.toLocaleString()} 段`,
+        note: '以文档详情里的切片数聚合'
+      }
+    ];
+  }, [documents, documentsQuery.data, props.data]);
+
+  if (props.isLoading && !documentsQuery.data && documentsQuery.isLoading) {
     return <PageSkeleton blocks={6} />;
   }
 
-  if (props.error) {
-    return <EmptyState icon={Database} title="知识库页面加载失败" description={getErrorMessage(props.error)} />;
-  }
-
-  if (!props.data) {
-    return null;
+  if (documentsQuery.error && !documents.length) {
+    return <EmptyState icon={Database} title="知识库页面加载失败" description={getErrorMessage(documentsQuery.error)} />;
   }
 
   return (
     <>
       <div className="grid gap-4 md:grid-cols-3">
-        {props.data.summary.map((item) => (
+        {summaryCards.map((item) => (
           <MetricCard key={item.id} label={item.label} value={item.value} note={item.note} accent="emerald" />
         ))}
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="文档列表" description="围绕分类、切片和入库状态进行管理，承接一期上传解析链路。">
+        <Panel title="文档列表" description="文档表格已接真实 documents 接口；上传成功后会刷新列表，并对非终态文档轮询状态。">
           <div className="mb-4 flex flex-wrap gap-2">
-            {props.data.categories.map((category) => (
-              <Badge key={category.id} tone={category.id === 'all' ? 'good' : 'neutral'}>
-                {category.label} · {category.count}
-              </Badge>
+            {categoryBadges.map((category) => (
+              <button key={category.id} type="button" onClick={() => setSelectedKnowledgeBaseId(category.id)}>
+                <Badge tone={selectedKnowledgeBaseId === category.id ? 'good' : 'neutral'}>
+                  {category.label} · {category.count}
+                </Badge>
+              </button>
             ))}
           </div>
+          {knowledgeBasesQuery.error ? (
+            <div className="mb-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+              {getErrorMessage(knowledgeBasesQuery.error)}
+            </div>
+          ) : null}
           <div className="overflow-hidden rounded-[24px] border border-white/10">
             <table className="w-full text-left text-sm">
               <thead className="bg-white/[0.04] text-white/50">
@@ -789,42 +1422,69 @@ function KnowledgePage(props: { data?: KnowledgeWorkspace; isLoading: boolean; e
                 </tr>
               </thead>
               <tbody>
-                {props.data.documents.map((item) => (
-                  <tr key={item.id} className="border-t border-white/8">
-                    <td className="px-4 py-3 text-white">{item.name}</td>
-                    <td className="px-4 py-3 text-white/58">{item.category}</td>
-                    <td className="px-4 py-3 text-white/58">{item.size}</td>
-                    <td className="px-4 py-3 text-white/58">{item.chunks}</td>
-                    <td className="px-4 py-3 text-white/45">{item.uploadedAt}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={statusTone(item.status)}>{item.status}</Badge>
+                {documents.length ? (
+                  documents.map((item) => (
+                    <tr key={item.id} className="border-t border-white/8">
+                      <td className="px-4 py-3 text-white">{item.name}</td>
+                      <td className="px-4 py-3 text-white/58">{item.knowledgeBaseName || item.category}</td>
+                      <td className="px-4 py-3 text-white/58">{item.size}</td>
+                      <td className="px-4 py-3 text-white/58">{item.chunks}</td>
+                      <td className="px-4 py-3 text-white/45">{item.uploadedAt}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone={statusTone(item.statusLabel)}>{item.statusLabel}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-white/45">
+                      当前分类下暂无文档。
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         </Panel>
 
-        <Panel title="上传入口" description="按照原型保留拖拽上传位、任务提示和文档准备说明。">
+        <Panel title="上传入口" description="真实调用 `/api/v1/documents/upload`，选择文件后立即上传并回刷文档状态。">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              if (files.length) {
+                uploadMutation.mutate(files);
+              }
+              event.target.value = '';
+            }}
+          />
           <div className="rounded-[28px] border border-dashed border-white/14 bg-white/[0.03] px-6 py-12 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d7ff64]/14 text-[#d7ff64]">
               <Upload className="h-6 w-6" />
             </div>
-            <h3 className="mt-4 text-xl font-semibold text-white">拖拽文件到此处上传</h3>
+            <h3 className="mt-4 text-xl font-semibold text-white">选择文件上传到知识库</h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/55">
-              文档上传、解析、切片、向量化和状态查询仍在等待真实接口，这里先把交互和布局稳定下来。
+              当前会把文件提交到真实 upload 接口，并对解析中、待切片的文档持续轮询状态。
             </p>
-            <Button className="mt-5">
+            <Button className="mt-5" disabled={uploadMutation.isPending} onClick={() => fileInputRef.current?.click()}>
               <Upload className="h-4 w-4" />
-              选择文件
+              {uploadMutation.isPending ? '上传中...' : '选择文件'}
             </Button>
           </div>
+
+          {uploadMutation.error ? (
+            <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-50">
+              {getErrorMessage(uploadMutation.error)}
+            </div>
+          ) : null}
 
           <div className="mt-5 grid gap-3">
             <InfoTile label="支持格式" value="PDF / DOCX / XLSX / TXT" />
             <InfoTile label="当前策略" value="先上传后轮询异步任务" tone="warn" />
-            <InfoTile label="展示要求" value="需保留状态、切片数、引用来源" tone="good" />
+            <InfoTile label="实时状态" value={pendingDocuments.length ? `${pendingDocuments.length} 份文档处理中` : '当前无轮询任务'} tone="good" />
           </div>
         </Panel>
       </div>
@@ -1294,12 +1954,23 @@ function PageSkeleton(props: { blocks: number }) {
   );
 }
 
-function statusTone(value: '已入库' | '解析中' | '待切片') {
+function getLatestReferences(messages: ConversationMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const item = messages[index];
+    if (item.role === 'assistant' && item.sources?.length) {
+      return item.sources;
+    }
+  }
+
+  return [];
+}
+
+function statusTone(value: string) {
   if (value === '已入库') {
     return 'good' as const;
   }
 
-  if (value === '解析中') {
+  if (value === '解析中' || value === '失败') {
     return 'warn' as const;
   }
 

@@ -4,10 +4,15 @@ server:
 spring:
   application:
     name: env-agent-backend-test
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:test-schema.sql
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/env_agent_ai
-    username: openclaw
-    password: openclaw
+    url: jdbc:h2:mem:env_agent_ai;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
   data:
     redis:
       host: 127.0.0.1
@@ -23,6 +28,8 @@ app:
   vector:
     dimensions: 1536
     similarity-threshold: 0.65
+  storage:
+    base-path: ./target/test-storage
   jwt:
     secret: ZW52LWFnZW50LWJhY2tlbmQtc2VjcmV0LWZvci1kZXYtdGVzdC0xMjM0NTY3ODkw
     expiration-seconds: 28800
