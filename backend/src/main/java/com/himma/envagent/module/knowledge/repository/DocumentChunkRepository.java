@@ -32,6 +32,8 @@ public class DocumentChunkRepository {
     }
 
     public void replaceChunks(long documentId, List<ChunkPayload> chunks) {
+        // 全量替换：先清旧切片，再批量插入新切片。
+        // 在 ingest 异常分支也会单独调用 deleteByDocumentId，二者协同保证状态一致。
         deleteByDocumentId(documentId);
         if (chunks.isEmpty()) {
             return;
@@ -43,7 +45,8 @@ public class DocumentChunkRepository {
             entity.setChunkIndex(chunk.chunkIndex());
             entity.setTokenCount(chunk.tokenCount());
             entity.setEmbedding(chunk.embedding());
-            entity.setMetadata("{\"chunkIndex\":" + chunk.chunkIndex() + "}");
+            // metadata 已经在上游序列化成 JSON 字符串，这里直接落库；Postgres 走 JSONB cast。
+            entity.setMetadata(chunk.metadataJson());
             if (postgres) {
                 documentChunkMapper.insertPostgres(entity);
             } else {
