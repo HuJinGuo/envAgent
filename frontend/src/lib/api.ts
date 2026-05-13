@@ -274,6 +274,82 @@ export type UsersWorkspace = {
   }>;
 };
 
+export type NavigationItem = {
+  id: string;
+  code: string;
+  name: string;
+  label: string;
+  path: string;
+  section: string;
+  icon: string;
+  sortOrder: number;
+  status: string;
+  visible: boolean;
+  roles: string[];
+  parentId?: string;
+  children: NavigationItem[];
+};
+
+export type AdminRoleRecord = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: string;
+  sortOrder: number;
+};
+
+export type AdminMenuRecord = {
+  id: string;
+  code: string;
+  name: string;
+  title: string;
+  path: string;
+  section: string;
+  icon: string;
+  parentId: string;
+  sortOrder: number;
+  status: string;
+  visible: boolean;
+  roles: string[];
+  component: string;
+  redirect: string;
+  children: AdminMenuRecord[];
+};
+
+export type AdminKnowledgeBaseRecord = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: string;
+  sortOrder: number;
+  documentCount: number;
+};
+
+export type AdminVendorRecord = {
+  id: string;
+  code: string;
+  name: string;
+  endpoint: string;
+  status: string;
+  sortOrder: number;
+};
+
+export type AdminModelRecord = {
+  id: string;
+  code: string;
+  name: string;
+  vendorId: string;
+  vendorName: string;
+  modelType: string;
+  contextWindow: number;
+  status: string;
+  sortOrder: number;
+};
+
+export type AdminUpsertPayload = Record<string, unknown>;
+
 export class ApiError extends Error {
   status: number;
   path: string;
@@ -296,6 +372,14 @@ export const apiRoutes = {
   documents: '/api/v1/documents',
   documentsUpload: '/api/v1/documents/upload',
   conversations: '/api/v1/conversations',
+  admin: {
+    navigation: '/api/v1/admin/navigation',
+    roles: '/api/v1/admin/roles',
+    menus: '/api/v1/admin/menus',
+    knowledgeBases: '/api/v1/admin/knowledge-bases',
+    vendors: '/api/v1/admin/vendors',
+    models: '/api/v1/admin/models'
+  },
   workspaces: {
     dashboard: '/api/v1/workspaces/dashboard',
     chat: '/api/v1/workspaces/chat',
@@ -677,6 +761,138 @@ export function fetchUsersWorkspace() {
   return request<UsersWorkspace>(apiRoutes.workspaces.users);
 }
 
+export function fetchAdminNavigation() {
+  return requestNormalized<NavigationItem[]>(apiRoutes.admin.navigation, normalizeNavigationList);
+}
+
+export function fetchAdminRoles() {
+  return requestNormalized<AdminRoleRecord[]>(apiRoutes.admin.roles, normalizeAdminRoleList);
+}
+
+export function createAdminRole(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminRoleRecord>(apiRoutes.admin.roles, normalizeAdminRole, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminRole(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminRoleRecord>(adminResourcePath(apiRoutes.admin.roles, id), normalizeAdminRole, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminRole(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.roles, id), {
+    method: 'DELETE'
+  });
+}
+
+export function fetchAdminMenus() {
+  return requestNormalized<AdminMenuRecord[]>(apiRoutes.admin.menus, normalizeAdminMenuList);
+}
+
+export function createAdminMenu(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminMenuRecord>(apiRoutes.admin.menus, normalizeAdminMenu, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminMenu(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminMenuRecord>(adminResourcePath(apiRoutes.admin.menus, id), normalizeAdminMenu, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminMenu(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.menus, id), {
+    method: 'DELETE'
+  });
+}
+
+export function fetchAdminKnowledgeBases() {
+  return requestNormalized<AdminKnowledgeBaseRecord[]>(apiRoutes.admin.knowledgeBases, normalizeAdminKnowledgeBaseList);
+}
+
+export function createAdminKnowledgeBase(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminKnowledgeBaseRecord>(apiRoutes.admin.knowledgeBases, normalizeAdminKnowledgeBase, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminKnowledgeBase(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminKnowledgeBaseRecord>(
+    adminResourcePath(apiRoutes.admin.knowledgeBases, id),
+    normalizeAdminKnowledgeBase,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export function deleteAdminKnowledgeBase(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.knowledgeBases, id), {
+    method: 'DELETE'
+  });
+}
+
+export function fetchAdminVendors() {
+  return requestNormalized<AdminVendorRecord[]>(apiRoutes.admin.vendors, normalizeAdminVendorList);
+}
+
+export function createAdminVendor(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminVendorRecord>(apiRoutes.admin.vendors, normalizeAdminVendor, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminVendor(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminVendorRecord>(adminResourcePath(apiRoutes.admin.vendors, id), normalizeAdminVendor, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminVendor(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.vendors, id), {
+    method: 'DELETE'
+  });
+}
+
+export function fetchAdminModels() {
+  return requestNormalized<AdminModelRecord[]>(apiRoutes.admin.models, normalizeAdminModelList);
+}
+
+export function createAdminModel(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminModelRecord>(apiRoutes.admin.models, normalizeAdminModel, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminModel(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminModelRecord>(adminResourcePath(apiRoutes.admin.models, id), normalizeAdminModel, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminModel(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.models, id), {
+    method: 'DELETE'
+  });
+}
+
+function adminResourcePath(basePath: string, id: string) {
+  return `${basePath}/${encodeURIComponent(id)}`;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
 }
@@ -756,6 +972,25 @@ function pickBoolean(record: Record<string, unknown> | null, keys: string[], fal
 
   if (typeof value === 'string') {
     return value === 'true';
+  }
+
+  return fallback;
+}
+
+function pickStringArray(record: Record<string, unknown> | null, keys: string[], fallback: string[] = []) {
+  const value = pickValue(record, keys);
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' || typeof item === 'number' ? String(item) : ''))
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   return fallback;
@@ -913,6 +1148,167 @@ function normalizeDocumentStatus(value: string) {
   }
 
   return { value: normalized || 'UNKNOWN', label: value || '未知', isTerminal: false };
+}
+
+function normalizeNavigationList(value: unknown): NavigationItem[] {
+  const record = asRecord(value);
+  const rootList = Array.isArray(value)
+    ? value
+    : asArray(pickValue(record, ['items', 'list', 'records', 'content', 'menus', 'navigation', 'data']));
+
+  return rootList
+    .map((item, index) => normalizeNavigationItem(item, index))
+    .filter((item) => item.section)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function normalizeNavigationItem(value: unknown, index = 0): NavigationItem {
+  const record = asRecord(value);
+  const rawCode = pickString(record, ['code', 'key'], '');
+  const section = normalizeMenuSection(pickString(record, ['section'], '') || rawCode || pickString(record, ['name'], ''));
+  const name = pickString(record, ['name', 'label', 'title'], section || `菜单 ${index + 1}`);
+  const children = asArray(pickValue(record, ['children', 'items', 'routes']))
+    .map((child, childIndex) => normalizeNavigationItem(child, childIndex))
+    .filter((child) => child.section)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+
+  return {
+    id: pickString(record, ['id', 'menuId', 'navigationId'], section || `nav-${index + 1}`),
+    code: rawCode || section,
+    name,
+    label: pickString(record, ['label', 'title'], name),
+    path: pickString(record, ['path', 'route', 'url'], ''),
+    section,
+    icon: pickString(record, ['icon', 'iconName'], ''),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order', 'weight'], index),
+    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    visible: pickBoolean(record, ['visible', 'enabled', 'show'], true),
+    roles: pickStringArray(record, ['roles', 'roleCodes', 'authorities'], []),
+    parentId: pickString(record, ['parentId', 'pid'], ''),
+    children
+  };
+}
+
+function normalizeMenuSection(value: string) {
+  const normalized = value.trim();
+  if (normalized === 'dashboard') {
+    return 'dash';
+  }
+  if (normalized === 'knowledge') {
+    return 'kb';
+  }
+  return normalized;
+}
+
+function normalizeAdminRoleList(value: unknown): AdminRoleRecord[] {
+  return normalizeAdminList(value, normalizeAdminRole);
+}
+
+function normalizeAdminRole(value: unknown, index = 0): AdminRoleRecord {
+  const record = asRecord(value);
+  const code = pickString(record, ['code', 'roleCode', 'key'], `ROLE_${index + 1}`);
+  return {
+    id: pickString(record, ['id', 'roleId'], code),
+    code,
+    name: pickString(record, ['name', 'roleName', 'label', 'title'], code),
+    description: pickString(record, ['description', 'desc', 'remark'], ''),
+    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
+  };
+}
+
+function normalizeAdminMenuList(value: unknown): AdminMenuRecord[] {
+  return normalizeAdminList(value, normalizeAdminMenu);
+}
+
+function normalizeAdminMenu(value: unknown, index = 0): AdminMenuRecord {
+  const item = normalizeNavigationItem(value, index);
+  const record = asRecord(value);
+  const children = asArray(pickValue(record, ['children', 'items', 'routes'])).map((child, childIndex) =>
+    normalizeAdminMenu(child, childIndex)
+  );
+  return {
+    id: item.id,
+    code: item.code || item.section,
+    name: item.name,
+    title: item.label || item.name,
+    path: item.path,
+    section: item.section,
+    icon: item.icon,
+    parentId: item.parentId ?? '',
+    sortOrder: item.sortOrder,
+    status: item.status,
+    visible: item.visible,
+    roles: item.roles,
+    component: pickString(record, ['component'], ''),
+    redirect: pickString(record, ['redirect'], ''),
+    children
+  };
+}
+
+function normalizeAdminKnowledgeBaseList(value: unknown): AdminKnowledgeBaseRecord[] {
+  return normalizeAdminList(value, normalizeAdminKnowledgeBase);
+}
+
+function normalizeAdminKnowledgeBase(value: unknown, index = 0): AdminKnowledgeBaseRecord {
+  const base = normalizeKnowledgeBase(value, index);
+  const record = asRecord(value);
+  return {
+    id: base.id,
+    code: pickString(record, ['code', 'kbCode'], base.id),
+    name: base.name,
+    description: base.description ?? '',
+    status: base.status || pickString(record, ['state'], 'ACTIVE'),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index),
+    documentCount: base.documentCount
+  };
+}
+
+function normalizeAdminVendorList(value: unknown): AdminVendorRecord[] {
+  return normalizeAdminList(value, normalizeAdminVendor);
+}
+
+function normalizeAdminVendor(value: unknown, index = 0): AdminVendorRecord {
+  const record = asRecord(value);
+  const code = pickString(record, ['code', 'vendorCode', 'key'], `vendor-${index + 1}`);
+  return {
+    id: pickString(record, ['id', 'vendorId'], code),
+    code,
+    name: pickString(record, ['name', 'vendorName', 'label'], code),
+    endpoint: pickString(record, ['endpoint', 'baseUrl', 'baseURL', 'url'], ''),
+    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
+  };
+}
+
+function normalizeAdminModelList(value: unknown): AdminModelRecord[] {
+  return normalizeAdminList(value, normalizeAdminModel);
+}
+
+function normalizeAdminModel(value: unknown, index = 0): AdminModelRecord {
+  const record = asRecord(value);
+  const vendor = asRecord(pickValue(record, ['vendor', 'provider']));
+  const code = pickString(record, ['code', 'modelCode', 'model', 'key'], `model-${index + 1}`);
+  return {
+    id: pickString(record, ['id', 'modelId'], code),
+    code,
+    name: pickString(record, ['name', 'modelName', 'label'], code),
+    vendorId: pickString(record, ['vendorId', 'providerId']) || pickString(vendor, ['id', 'vendorId'], ''),
+    vendorName: pickString(record, ['vendorName', 'providerName']) || pickString(vendor, ['name', 'vendorName'], ''),
+    modelType: pickString(record, ['modelType', 'type', 'category'], 'chat'),
+    contextWindow: pickNumber(record, ['contextWindow', 'contextLength', 'maxContext'], 0),
+    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
+  };
+}
+
+function normalizeAdminList<T>(value: unknown, normalize: (item: unknown, index: number) => T): T[] {
+  const record = asRecord(value);
+  const list = Array.isArray(value)
+    ? value
+    : asArray(pickValue(record, ['items', 'list', 'records', 'content', 'data']));
+
+  return list.map((item, index) => normalize(item, index));
 }
 
 function normalizeConversationList(value: unknown): ConversationRecord[] {

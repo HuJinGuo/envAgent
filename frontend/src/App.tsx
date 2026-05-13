@@ -1,19 +1,10 @@
-import { useEffect, useMemo, useState, useTransition } from 'react';
-import {
-  BarChart3,
-  Bot,
-  Building2,
-  ChevronRight,
-  Database,
-  Gauge,
-  LogOut,
-  MessageSquareText,
-  ShieldCheck,
-  Users
-} from 'lucide-react';
+import { Suspense, useEffect, useMemo, useState, useTransition } from 'react';
+import { ChevronRight, LogOut, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
+  type NavigationItem,
+  fetchAdminNavigation,
   fetchAgentWorkspace,
   fetchChatWorkspace,
   fetchCurrentUser,
@@ -27,92 +18,200 @@ import {
   type LoginRequest
 } from './lib/api';
 import { cn } from './lib/utils';
-import { useSessionStore, type WorkspaceSection } from './store/session-store';
+import { useSessionStore } from './store/session-store';
 import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { EmptyState } from './components/ui/empty-state';
 import { Input } from './components/ui/input';
-import { DashboardPage } from './pages/dashboard-page';
-import { ChatPage } from './pages/chat-page';
-import { KnowledgePage } from './pages/knowledge-page';
-import { SourcePage } from './pages/source-page';
-import { AgentPage } from './pages/agent-page';
-import { MonitorPage } from './pages/monitor-page';
-import { UsersPage } from './pages/users-page';
-import { getErrorMessage, TopStat } from './pages/shared';
+import {
+  fallbackWorkspaceRoutes,
+  getWorkspaceRouteByPath,
+  normalizeWorkspacePath,
+  resolveWorkspaceRoute,
+  type WorkspaceRouteDefinition,
+  type WorkspaceRouteKey
+} from './lib/workspace-routes';
+import { getErrorMessage, PageSkeleton, TopStat } from './pages/shared';
 
-const pageMeta: Record<
-  WorkspaceSection,
-  { label: string; title: string; description: string; icon: typeof Gauge }
-> = {
-  dash: {
-    label: '仪表盘',
-    title: '环境监管工作台概览',
-    description: '汇总问答、知识库、Agent 与系统状态，先承接 MVP 与二期功能的全局入口。',
-    icon: Gauge
-  },
-  chat: {
-    label: '智能问答',
-    title: 'RAG 问答主工作区',
-    description: '保留会话、知识库范围、引用来源和输入面板，按文档要求为后续 SSE 对话预留结构。',
-    icon: MessageSquareText
-  },
-  kb: {
-    label: '知识库',
-    title: '知识库管理与上传',
-    description: '围绕文档上传、切片、向量化与状态跟踪组织页面，支撑知识入库与检索管理。',
-    icon: Database
-  },
-  source: {
-    label: '污染源档案',
-    title: '企业档案与监测风险',
-    description: '把企业许可、在线监测、风险等级和合规备注编排成执法与分析共用的档案页。',
-    icon: Building2
-  },
-  agent: {
-    label: 'Agent 任务',
-    title: 'Agent 任务工作台',
-    description: '聚焦任务发起、执行流、工具可用性和输出预览，贴合三期规划中的工具调用框架。',
-    icon: Bot
-  },
-  monitor: {
-    label: '系统监控',
-    title: '模型调用与服务监控',
-    description: '围绕 Token、调用记录、可用性和响应时延组织，后续可直接替换为真实观测接口。',
-    icon: BarChart3
-  },
-  users: {
-    label: '用户管理',
-    title: '用户与权限矩阵',
-    description: '以角色权限为主线呈现内部使用者结构，服务管理层对权限边界的确认。',
-    icon: Users
+type VisibleNavigationItem = {
+  id: string;
+  label: string;
+  path: string;
+  route: WorkspaceRouteDefinition;
+  children: VisibleNavigationItem[];
+  sortOrder: number;
+};
+
+type WorkspaceRenderContext = {
+  dashboardQuery: any;
+  healthQuery: any;
+  chatQuery: any;
+  chatSearch: string;
+  setChatSearch: (value: string) => void;
+  chatSessionId: string | null;
+  setChatSessionId: (id: string | null) => void;
+  knowledgeQuery: any;
+  sourceQuery: any;
+  selectedEnterprise: unknown;
+  setEnterpriseId: (id: string | null) => void;
+  agentQuery: any;
+  monitorQuery: any;
+  usersQuery: any;
+  selectedUser: unknown;
+  setUserId: (id: string | null) => void;
+};
+
+const routePropBuilders: Record<WorkspaceRouteKey, (context: WorkspaceRenderContext) => Record<string, unknown>> = {
+  dash: (context) => ({
+    dashboard: context.dashboardQuery.data?.data,
+    dashboardLoading: context.dashboardQuery.isLoading,
+    dashboardError: context.dashboardQuery.error,
+    health: context.healthQuery.data?.data,
+    healthLoading: context.healthQuery.isLoading,
+    healthError: context.healthQuery.error,
+    onRefresh: () => {
+      void context.dashboardQuery.refetch();
+      void context.healthQuery.refetch();
+    }
+  }),
+  chat: (context) => ({
+    workspace: context.chatQuery.data?.data,
+    workspaceLoading: context.chatQuery.isLoading,
+    workspaceError: context.chatQuery.error,
+    search: context.chatSearch,
+    onSearch: context.setChatSearch,
+    sessionId: context.chatSessionId,
+    onSessionChange: context.setChatSessionId
+  }),
+  kb: (context) => ({
+    data: context.knowledgeQuery.data?.data,
+    isLoading: context.knowledgeQuery.isLoading,
+    error: context.knowledgeQuery.error
+  }),
+  source: (context) => ({
+    data: context.sourceQuery.data?.data,
+    isLoading: context.sourceQuery.isLoading,
+    error: context.sourceQuery.error,
+    selectedEnterprise: context.selectedEnterprise,
+    onSelect: context.setEnterpriseId
+  }),
+  agent: (context) => ({
+    data: context.agentQuery.data?.data,
+    isLoading: context.agentQuery.isLoading,
+    error: context.agentQuery.error
+  }),
+  monitor: (context) => ({
+    data: context.monitorQuery.data?.data,
+    isLoading: context.monitorQuery.isLoading,
+    error: context.monitorQuery.error,
+    health: context.healthQuery.data?.data
+  }),
+  users: (context) => ({
+    data: context.usersQuery.data?.data,
+    isLoading: context.usersQuery.isLoading,
+    error: context.usersQuery.error,
+    selectedUser: context.selectedUser,
+    onSelect: context.setUserId
+  }),
+  admin: () => ({})
+};
+
+function getCurrentPathname() {
+  if (typeof window === 'undefined') {
+    return '/';
   }
-};
-
-const navItems: WorkspaceSection[] = ['dash', 'chat', 'kb', 'source', 'agent', 'monitor', 'users'];
-
-const sectionRoles: Record<WorkspaceSection, Array<'INSPECTOR' | 'ANALYST' | 'ADMIN'>> = {
-  dash: ['INSPECTOR', 'ANALYST', 'ADMIN'],
-  chat: ['INSPECTOR', 'ANALYST', 'ADMIN'],
-  kb: ['ANALYST', 'ADMIN'],
-  source: ['INSPECTOR', 'ANALYST', 'ADMIN'],
-  agent: ['ANALYST', 'ADMIN'],
-  monitor: ['ADMIN'],
-  users: ['ADMIN']
-};
-
-function isWorkspaceSection(value: string): value is WorkspaceSection {
-  return value in pageMeta;
+  return normalizeWorkspacePath(window.location.pathname, '/');
 }
 
-function canAccessSection(section: WorkspaceSection, role?: string | null) {
-  return !role || sectionRoles[section].includes(role as 'INSPECTOR' | 'ANALYST' | 'ADMIN');
+function navigateToPath(path: string, replace = false) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const nextPath = normalizeWorkspacePath(path, '/');
+  if (window.location.pathname === nextPath) {
+    return;
+  }
+  window.history[replace ? 'replaceState' : 'pushState'](null, '', nextPath);
+  window.dispatchEvent(new Event('codex:navigate'));
+}
+
+function canAccessRoles(roles: string[], role?: string | null) {
+  if (!roles.length) {
+    return true;
+  }
+  return !role || roles.includes(role);
+}
+
+function isVisibleStatus(status: string) {
+  return !['DISABLED', 'INACTIVE', 'DELETED'].includes(status.trim().toUpperCase());
+}
+
+function flattenNavigationItems(items: VisibleNavigationItem[]): VisibleNavigationItem[] {
+  const flattened: VisibleNavigationItem[] = [];
+  for (const item of items) {
+    flattened.push(item);
+    if (item.children.length) {
+      flattened.push(...flattenNavigationItems(item.children));
+    }
+  }
+  return flattened;
+}
+
+function resolveNavigationTree(items: NavigationItem[], role?: string | null): VisibleNavigationItem[] {
+  return items
+    .map((item) => {
+      const route = resolveWorkspaceRoute(item.section);
+      if (!route || !item.visible || !isVisibleStatus(item.status) || !canAccessRoles(item.roles, role)) {
+        return null;
+      }
+
+      return {
+        id: item.id,
+        label: item.label || item.name || route.meta.label,
+        path: normalizeWorkspacePath(item.path, route.defaultPath),
+        route,
+        sortOrder: item.sortOrder,
+        children: resolveNavigationTree(item.children, role)
+      } satisfies VisibleNavigationItem;
+    })
+    .filter((item): item is VisibleNavigationItem => Boolean(item))
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function buildFallbackNavigation(role?: string | null) {
+  return fallbackWorkspaceRoutes
+    .filter((route) => canAccessRoles(route.defaultRoles, role))
+    .map(
+      (route, index) =>
+        ({
+          id: `fallback-${route.key}`,
+          label: route.meta.label,
+          path: route.defaultPath,
+          route,
+          sortOrder: index,
+          children: []
+        }) satisfies VisibleNavigationItem
+    );
+}
+
+function useBrowserPathname() {
+  const [pathname, setPathname] = useState(getCurrentPathname);
+
+  useEffect(() => {
+    const syncPathname = () => setPathname(getCurrentPathname());
+    window.addEventListener('popstate', syncPathname);
+    window.addEventListener('codex:navigate', syncPathname);
+    return () => {
+      window.removeEventListener('popstate', syncPathname);
+      window.removeEventListener('codex:navigate', syncPathname);
+    };
+  }, []);
+
+  return pathname;
 }
 
 function App() {
   const queryClient = useQueryClient();
-  const selectedSection = useSessionStore((state) => state.selectedSection);
-  const setSelectedSection = useSessionStore((state) => state.setSelectedSection);
   const token = useSessionStore((state) => state.token);
   const storedUser = useSessionStore((state) => state.user);
   const setSession = useSessionStore((state) => state.setSession);
@@ -120,6 +219,7 @@ function App() {
   const clearSession = useSessionStore((state) => state.clearSession);
   const credentials = useSessionStore((state) => state.credentials);
   const setCredential = useSessionStore((state) => state.setCredential);
+  const pathname = useBrowserPathname();
   const [isSwitching, startTransition] = useTransition();
   const [chatSearch, setChatSearch] = useState('');
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
@@ -127,7 +227,9 @@ function App() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const hasSession = Boolean(token);
-  const sessionRole = storedUser?.role ?? null;
+  const persistedRole = storedUser?.role ?? null;
+  const fallbackRoute = getWorkspaceRouteByPath(pathname);
+  const fallbackRouteKey = fallbackRoute?.key ?? 'dash';
 
   const healthQuery = useQuery({
     queryKey: ['system-health'],
@@ -142,59 +244,79 @@ function App() {
     retry: false
   });
 
+  const navigationQuery = useQuery({
+    queryKey: ['admin-navigation', token],
+    queryFn: fetchAdminNavigation,
+    staleTime: 60_000,
+    enabled: hasSession,
+    retry: false
+  });
+
+  const activeUser = meQuery.data?.data ?? storedUser;
+  const activeRole = activeUser?.role ?? persistedRole;
+  const fallbackNavigation = useMemo(() => buildFallbackNavigation(activeRole), [activeRole]);
+  const visibleNavTree = useMemo(() => {
+    if (navigationQuery.data?.data?.length) {
+      const resolvedTree = resolveNavigationTree(navigationQuery.data.data, activeRole);
+      if (resolvedTree.length) {
+        return resolvedTree;
+      }
+    }
+    return fallbackNavigation;
+  }, [activeRole, fallbackNavigation, navigationQuery.data]);
+  const visibleNavItems = useMemo(() => flattenNavigationItems(visibleNavTree), [visibleNavTree]);
+  const activeNavItem = visibleNavItems.find((item) => item.path === pathname) ?? null;
+  const activeRoute = activeNavItem?.route ?? fallbackRoute;
+  const activeRouteKey = activeRoute?.key ?? fallbackRouteKey;
+
   const dashboardQuery = useQuery({
     queryKey: ['workspace-dashboard', token],
     queryFn: fetchDashboardSnapshot,
     staleTime: 60_000,
-    enabled: hasSession
+    enabled: hasSession && activeRouteKey === 'dash'
   });
 
   const chatQuery = useQuery({
     queryKey: ['workspace-chat', token],
     queryFn: fetchChatWorkspace,
     staleTime: 60_000,
-    enabled: hasSession
+    enabled: hasSession && activeRouteKey === 'chat'
   });
 
   const knowledgeQuery = useQuery({
     queryKey: ['workspace-knowledge', token],
     queryFn: fetchKnowledgeWorkspace,
     staleTime: 60_000,
-    enabled: hasSession && canAccessSection('kb', sessionRole)
+    enabled: hasSession && activeRouteKey === 'kb'
   });
 
   const sourceQuery = useQuery({
     queryKey: ['workspace-source', token],
     queryFn: fetchSourceWorkspace,
     staleTime: 60_000,
-    enabled: hasSession
+    enabled: hasSession && activeRouteKey === 'source'
   });
 
   const agentQuery = useQuery({
     queryKey: ['workspace-agent', token],
     queryFn: fetchAgentWorkspace,
     staleTime: 60_000,
-    enabled: hasSession && canAccessSection('agent', sessionRole)
+    enabled: hasSession && activeRouteKey === 'agent'
   });
 
   const monitorQuery = useQuery({
     queryKey: ['workspace-monitor', token],
     queryFn: fetchMonitorWorkspace,
     staleTime: 60_000,
-    enabled: hasSession && canAccessSection('monitor', sessionRole)
+    enabled: hasSession && activeRouteKey === 'monitor'
   });
 
   const usersQuery = useQuery({
     queryKey: ['workspace-users', token],
     queryFn: fetchUsersWorkspace,
     staleTime: 60_000,
-    enabled: hasSession && canAccessSection('users', sessionRole)
+    enabled: hasSession && activeRouteKey === 'users'
   });
-
-  const activeUser = meQuery.data?.data ?? storedUser;
-  const activeRole = activeUser?.role ?? null;
-  const activeSection = isWorkspaceSection(selectedSection) ? selectedSection : 'dash';
-  const visibleNavItems = navItems.filter((item) => canAccessSection(item, activeRole));
 
   const clearProtectedQueries = () => {
     queryClient.removeQueries({ queryKey: ['current-user'] });
@@ -205,6 +327,8 @@ function App() {
     queryClient.removeQueries({ queryKey: ['workspace-agent'] });
     queryClient.removeQueries({ queryKey: ['workspace-monitor'] });
     queryClient.removeQueries({ queryKey: ['workspace-users'] });
+    queryClient.removeQueries({ queryKey: ['admin-navigation'] });
+    queryClient.removeQueries({ queryKey: ['admin-management'] });
     queryClient.removeQueries({ queryKey: ['conversations'] });
     queryClient.removeQueries({ queryKey: ['conversation-messages'] });
     queryClient.removeQueries({ queryKey: ['knowledge-bases'] });
@@ -233,10 +357,11 @@ function App() {
   }, [hasSession]);
 
   useEffect(() => {
-    if (!canAccessSection(activeSection, activeRole) && visibleNavItems.length) {
-      setSelectedSection(visibleNavItems[0]);
+    if (!hasSession || !visibleNavItems.length || activeNavItem) {
+      return;
     }
-  }, [activeRole, activeSection, setSelectedSection, visibleNavItems]);
+    navigateToPath(visibleNavItems[0].path, true);
+  }, [activeNavItem, hasSession, visibleNavItems]);
 
   useEffect(() => {
     if (!enterpriseId && sourceQuery.data?.data.enterprises.length) {
@@ -264,7 +389,6 @@ function App() {
       void queryClient.invalidateQueries({ queryKey: ['workspace-users'] });
     }
   });
-  const meta = pageMeta[activeSection];
 
   const selectedEnterprise = useMemo(() => {
     const enterprises = sourceQuery.data?.data.enterprises ?? [];
@@ -279,6 +403,28 @@ function App() {
   const handleLogout = () => {
     clearSession();
     clearProtectedQueries();
+  };
+
+  const activeMeta = activeNavItem?.route.meta ?? activeRoute?.meta ?? fallbackWorkspaceRoutes[0].meta;
+  const activeLabel = activeNavItem?.label ?? activeMeta.label;
+  const ActiveComponent = activeRoute?.Component ?? null;
+  const renderContext: WorkspaceRenderContext = {
+    dashboardQuery,
+    healthQuery,
+    chatQuery,
+    chatSearch,
+    setChatSearch,
+    chatSessionId,
+    setChatSessionId,
+    knowledgeQuery,
+    sourceQuery,
+    selectedEnterprise,
+    setEnterpriseId,
+    agentQuery,
+    monitorQuery,
+    usersQuery,
+    selectedUser,
+    setUserId
   };
 
   return (
@@ -300,40 +446,18 @@ function App() {
             </div>
 
             <nav className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2">
-              {visibleNavItems.map((id) => {
-                const item = pageMeta[id];
-                const Icon = item.icon;
-                const active = activeSection === id;
-
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() =>
-                      startTransition(() => {
-                        setSelectedSection(id);
-                      })
-                    }
-                    className={cn(
-                      'flex min-w-[198px] items-center justify-between rounded-2xl border px-3 py-3 text-left transition md:w-full md:min-w-0',
-                      active
-                        ? 'border-[#d7ff64]/50 bg-[#d7ff64]/12 text-white'
-                        : 'border-white/10 bg-white/[0.03] text-white/68 hover:border-white/18 hover:bg-white/[0.05]'
-                    )}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/20">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span>
-                        <span className="block text-sm font-medium">{item.label}</span>
-                        <span className="block text-xs text-white/42">{pageHint(id)}</span>
-                      </span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 opacity-50" />
-                  </button>
-                );
-              })}
+              {visibleNavTree.map((item) => (
+                <SidebarNavNode
+                  key={item.id}
+                  item={item}
+                  activePath={pathname}
+                  onSelect={(path) =>
+                    startTransition(() => {
+                      navigateToPath(path);
+                    })
+                  }
+                />
+              ))}
             </nav>
           </div>
 
@@ -394,15 +518,15 @@ function App() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <Badge tone="neutral">{meta.label}</Badge>
+                <Badge tone="neutral">{activeLabel}</Badge>
                 <Badge tone={healthQuery.data?.data.status === 'UP' ? 'good' : 'warn'}>
                   {healthQuery.data?.data.status ?? '未连接'}
                 </Badge>
                 {isSwitching ? <span className="text-xs text-white/40">视图切换中</span> : null}
               </div>
               <div>
-                <h1 className="font-display text-3xl text-white md:text-5xl">{meta.title}</h1>
-                <p className="mt-3 max-w-4xl text-sm leading-7 text-white/58 md:text-base">{meta.description}</p>
+                <h1 className="font-display text-3xl text-white md:text-5xl">{activeMeta.title}</h1>
+                <p className="mt-3 max-w-4xl text-sm leading-7 text-white/58 md:text-base">{activeMeta.description}</p>
               </div>
             </div>
 
@@ -435,71 +559,17 @@ function App() {
             />
           ) : null}
 
-          {hasSession && activeSection === 'dash' ? (
-            <DashboardPage
-              dashboard={dashboardQuery.data?.data}
-              dashboardLoading={dashboardQuery.isLoading}
-              dashboardError={dashboardQuery.error}
-              health={healthQuery.data?.data}
-              healthLoading={healthQuery.isLoading}
-              healthError={healthQuery.error}
-              onRefresh={() => {
-                void dashboardQuery.refetch();
-                void healthQuery.refetch();
-              }}
-            />
+          {hasSession && ActiveComponent ? (
+            <Suspense fallback={<PageSkeleton blocks={6} />}>
+              <ActiveComponent {...routePropBuilders[activeRouteKey](renderContext)} />
+            </Suspense>
           ) : null}
 
-          {hasSession && activeSection === 'chat' ? (
-            <ChatPage
-              workspace={chatQuery.data?.data}
-              workspaceLoading={chatQuery.isLoading}
-              workspaceError={chatQuery.error}
-              search={chatSearch}
-              onSearch={setChatSearch}
-              sessionId={chatSessionId}
-              onSessionChange={setChatSessionId}
-            />
-          ) : null}
-
-          {hasSession && activeSection === 'kb' ? (
-            <KnowledgePage
-              data={knowledgeQuery.data?.data}
-              isLoading={knowledgeQuery.isLoading}
-              error={knowledgeQuery.error}
-            />
-          ) : null}
-
-          {hasSession && activeSection === 'source' ? (
-            <SourcePage
-              data={sourceQuery.data?.data}
-              isLoading={sourceQuery.isLoading}
-              error={sourceQuery.error}
-              selectedEnterprise={selectedEnterprise}
-              onSelect={setEnterpriseId}
-            />
-          ) : null}
-
-          {hasSession && activeSection === 'agent' ? (
-            <AgentPage data={agentQuery.data?.data} isLoading={agentQuery.isLoading} error={agentQuery.error} />
-          ) : null}
-
-          {hasSession && activeSection === 'monitor' ? (
-            <MonitorPage
-              data={monitorQuery.data?.data}
-              isLoading={monitorQuery.isLoading}
-              error={monitorQuery.error}
-              health={healthQuery.data?.data}
-            />
-          ) : null}
-
-          {hasSession && activeSection === 'users' ? (
-            <UsersPage
-              data={usersQuery.data?.data}
-              isLoading={usersQuery.isLoading}
-              error={usersQuery.error}
-              selectedUser={selectedUser}
-              onSelect={setUserId}
+          {hasSession && !ActiveComponent ? (
+            <EmptyState
+              icon={TriangleAlert}
+              title="菜单未匹配到页面"
+              description={`当前路径 ${pathname} 没有对应的前端页面注册，请检查菜单管理中的 path / section / component 配置。`}
             />
           ) : null}
         </div>
@@ -508,16 +578,75 @@ function App() {
   );
 }
 
+function SidebarNavNode(props: {
+  item: VisibleNavigationItem;
+  activePath: string;
+  onSelect: (path: string) => void;
+  depth?: number;
+}) {
+  const depth = props.depth ?? 0;
+  const active = props.activePath === props.item.path;
 
-function pageHint(id: WorkspaceSection) {
-  if (id === 'dash') return '总览';
-  if (id === 'chat') return 'RAG 问答';
-  if (id === 'kb') return '上传与入库';
-  if (id === 'source') return '企业档案';
-  if (id === 'agent') return '任务流';
-  if (id === 'monitor') return 'Token 与日志';
-  return 'RBAC';
+  return (
+    <div className="space-y-2">
+      <SidebarNavButton
+        route={props.item.route}
+        label={props.item.label}
+        hint={props.item.path}
+        active={active}
+        depth={depth}
+        onSelect={() => props.onSelect(props.item.path)}
+      />
+      {props.item.children.length ? (
+        <div className="space-y-2">
+          {props.item.children.map((child) => (
+            <SidebarNavNode
+              key={child.id}
+              item={child}
+              depth={depth + 1}
+              activePath={props.activePath}
+              onSelect={props.onSelect}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SidebarNavButton(props: {
+  route: WorkspaceRouteDefinition;
+  label: string;
+  hint: string;
+  active: boolean;
+  onSelect: () => void;
+  depth?: number;
+}) {
+  const Icon = props.route.meta.icon;
+  return (
+    <button
+      type="button"
+      onClick={props.onSelect}
+      className={cn(
+        'flex min-w-[198px] items-center justify-between rounded-2xl border px-3 py-3 text-left transition md:w-full md:min-w-0',
+        props.active
+          ? 'border-[#d7ff64]/50 bg-[#d7ff64]/12 text-white'
+          : 'border-white/10 bg-white/[0.03] text-white/68 hover:border-white/18 hover:bg-white/[0.05]'
+      )}
+      style={{ marginLeft: (props.depth ?? 0) * 14 }}
+    >
+      <span className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/20">
+          <Icon className="h-4 w-4" />
+        </span>
+        <span>
+          <span className="block text-sm font-medium">{props.label}</span>
+          <span className="block text-xs text-white/42">{props.hint}</span>
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 opacity-50" />
+    </button>
+  );
 }
 
 export default App;
-

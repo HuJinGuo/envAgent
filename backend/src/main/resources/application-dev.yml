@@ -39,7 +39,7 @@ app:
     embedding-api-key: ${OPENAI_EMBEDDING_API_KEY:${DASHSCOPE_API_KEY:}}
     embedding-dimensions-enabled: ${OPENAI_EMBEDDING_DIMENSIONS_ENABLED:false}
   vector:
-    dimensions: ${VECTOR_DIMENSIONS:1024}
+    dimensions: ${VECTOR_DIMENSIONS:1536}
     similarity-threshold: ${VECTOR_SIMILARITY_THRESHOLD:0.65}
   storage:
     base-path: ${APP_STORAGE_BASE_PATH:./data}

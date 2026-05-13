@@ -26,6 +26,69 @@ ALTER TABLE knowledge_bases ADD COLUMN IF NOT EXISTS code VARCHAR(64);
 ALTER TABLE knowledge_bases ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE knowledge_bases ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
+CREATE TABLE IF NOT EXISTS sys_roles (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(32) NOT NULL UNIQUE,
+    name VARCHAR(64) NOT NULL,
+    description TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sys_menus (
+    id BIGSERIAL PRIMARY KEY,
+    parent_id BIGINT,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(64) NOT NULL,
+    title VARCHAR(128) NOT NULL,
+    path VARCHAR(255) NOT NULL,
+    component VARCHAR(128),
+    icon VARCHAR(64),
+    redirect VARCHAR(255),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    visible BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sys_role_menus (
+    id BIGSERIAL PRIMARY KEY,
+    role_id BIGINT NOT NULL,
+    menu_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (role_id, menu_id)
+);
+
+CREATE TABLE IF NOT EXISTS model_vendors (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(128) NOT NULL,
+    base_url VARCHAR(512),
+    api_key_masked VARCHAR(128),
+    description TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_models (
+    id BIGSERIAL PRIMARY KEY,
+    vendor_id BIGINT NOT NULL,
+    code VARCHAR(128) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    model_type VARCHAR(32) NOT NULL DEFAULT 'CHAT',
+    context_window INTEGER,
+    max_output_tokens INTEGER,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (vendor_id, code)
+);
+
 CREATE TABLE IF NOT EXISTS documents (
     id BIGSERIAL PRIMARY KEY,
     kb_id BIGINT,
@@ -94,4 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_document_chunks_doc_id ON document_chunks(doc_id)
 CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conv_id ON messages(conv_id);
 CREATE INDEX IF NOT EXISTS idx_async_tasks_ref ON async_tasks(task_type, ref_id);
+CREATE INDEX IF NOT EXISTS idx_sys_role_menus_role ON sys_role_menus(role_id);
+CREATE INDEX IF NOT EXISTS idx_sys_role_menus_menu ON sys_role_menus(menu_id);
+CREATE INDEX IF NOT EXISTS idx_ai_models_vendor ON ai_models(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
