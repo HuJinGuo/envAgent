@@ -16,6 +16,7 @@ export type WorkspaceRouteKey = 'dash' | 'chat' | 'kb' | 'source' | 'agent' | 'm
 export type WorkspaceRouteDefinition = {
   key: WorkspaceRouteKey;
   componentName: string;
+  aliases?: string[];
   defaultPath: string;
   defaultRoles: string[];
   meta: {
@@ -40,8 +41,9 @@ const AdminPage = lazy(() => import('../pages/admin-page').then((module) => ({ d
 export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDefinition> = {
   dash: {
     key: 'dash',
-    componentName: 'DashView',
-    defaultPath: '/',
+    componentName: 'DashboardView',
+    aliases: ['DashView'],
+    defaultPath: '/dashboard',
     defaultRoles: ['INSPECTOR', 'ANALYST', 'ADMIN'],
     meta: {
       label: '仪表盘',
@@ -125,7 +127,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
   users: {
     key: 'users',
     componentName: 'UsersView',
-    defaultPath: '/users',
+    defaultPath: '/admin/users',
     defaultRoles: ['ADMIN'],
     meta: {
       label: '用户管理',
@@ -139,7 +141,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
   admin: {
     key: 'admin',
     componentName: 'AdminView',
-    defaultPath: '/admin',
+    defaultPath: '/admin/roles',
     defaultRoles: ['ADMIN'],
     meta: {
       label: '基础管理',
@@ -156,6 +158,9 @@ const workspaceRouteKeys = Object.keys(workspaceRouteRegistry) as WorkspaceRoute
 const componentRouteRegistry = workspaceRouteKeys.reduce<Record<string, WorkspaceRouteDefinition>>((accumulator, key) => {
   const route = workspaceRouteRegistry[key];
   accumulator[route.componentName.toLowerCase()] = route;
+  for (const alias of route.aliases ?? []) {
+    accumulator[alias.toLowerCase()] = route;
+  }
   return accumulator;
 }, {});
 

@@ -13,9 +13,13 @@ import com.himma.envagent.module.conversation.vo.ConversationPayloads.Conversati
 import com.himma.envagent.module.conversation.vo.ConversationPayloads.ConversationReply;
 import com.himma.envagent.module.conversation.vo.ConversationPayloads.MessageItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.SourceItem;
+import com.himma.envagent.module.rag.service.LlmChatService;
 import com.himma.envagent.module.rag.service.ModelGateway.ChatTurn;
 import com.himma.envagent.module.rag.service.RagService;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,17 +32,51 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final RagService ragService;
+    private final LlmChatService llmChatService;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 会话层内部上下文：
+     * 把“当前问题、历史消息、RAG 上下文、是否需要改标题”集中起来，
+     * 避免同步 / 流式两条链路各自重复准备一遍。
+     */
+    private record ReplyContext(
+            String question,
+            ConversationRecord conversation,
+            RagService.RagContext ragContext,
+            boolean shouldUpdateTitle
+    ) {
+    }
+
+    public interface ReplyStreamListener {
+
+        default void onThinking(String thinking) {
+        }
+
+        default void onSources(List<SourceItem> sources) {
+        }
+
+        default void onDelta(String delta) {
+        }
+
+        default void onComplete(ConversationReply reply) {
+        }
+
+        default void onError(Throwable error) {
+        }
+    }
 
     public ConversationService(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
             RagService ragService,
+            LlmChatService llmChatService,
             ObjectMapper objectMapper
     ) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.ragService = ragService;
+        this.llmChatService = llmChatService;
         this.objectMapper = objectMapper;
     }
 
@@ -87,44 +125,102 @@ public class ConversationService {
 
     @Transactional
     public ConversationReply reply(long userId, long conversationId, String content) {
-        ConversationRecord conversation = requireConversation(userId, conversationId);
-        String trimmed = content == null ? "" : content.trim();
-        if (trimmed.isBlank()) {
-            throw new BusinessException(400, "content 不能为空");
-        }
-
-        // 先保存用户问题，再去调 RAG，这样即使后续模型失败，也能保留完整会话轨迹。
-        long userMessageId = messageRepository.insert(conversationId, "user", trimmed, "[]", estimateTokens(trimmed), null);
-        List<MessageRecord> historyRecords = messageRepository.findByConversationId(conversationId);
-        if (conversation.messageCount() == 0 || "新建会话".equals(conversation.title())) {
-            // 首轮对话自动把标题改成问题摘要，方便会话列表展示。
-            conversationRepository.updateTitle(conversationId, userId, summarizeTitle(trimmed));
-        }
-
-        // 历史消息不包含刚保存的当前 user turn，避免在 prompt 里重复一次当前问题。
-        List<ChatTurn> history = historyRecords.stream()
-                .filter(message -> message.id() != userMessageId)
-                .map(message -> new ChatTurn(message.role(), message.content()))
-                .toList();
-        RagService.RagAnswer ragAnswer = ragService.answer(trimmed, conversation.kbIds(), history);
-        String sourcesJson = writeSources(ragAnswer.sources());
+        ReplyContext replyContext = prepareReplyContext(userId, conversationId, content);
+        RagService.RagContext ragContext = replyContext.ragContext();
+        LlmChatService.GenerationResult generationResult = llmChatService.answer(
+                ragContext.turns(),
+                ragContext.question(),
+                ragContext.fallbackAnswer()
+        );
+        String sourcesJson = writeSources(ragContext.sources());
         // assistant 回复和命中的 sources 一起持久化，后续消息列表和 sources 面板都靠它回显。
         long assistantMessageId = messageRepository.insert(
                 conversationId,
                 "assistant",
-                ragAnswer.answer(),
+                generationResult.answer(),
                 sourcesJson,
-                ragAnswer.inputTokens(),
-                ragAnswer.outputTokens()
+                generationResult.inputTokens(),
+                generationResult.outputTokens()
         );
         conversationRepository.touch(conversationId);
+        applyTitleUpdateIfNeeded(userId, replyContext);
         return new ConversationReply(
                 assistantMessageId,
-                ragAnswer.answer(),
-                ragAnswer.sources(),
-                ragAnswer.inputTokens(),
-                ragAnswer.outputTokens()
+                generationResult.answer(),
+                ragContext.sources(),
+                generationResult.inputTokens(),
+                generationResult.outputTokens()
         );
+    }
+
+    public void streamReply(long userId, long conversationId, String content, ReplyStreamListener listener) {
+        ReplyStreamListener safeListener = listener == null ? new ReplyStreamListener() {
+        } : listener;
+        ReplyContext replyContext = prepareReplyContext(userId, conversationId, content);
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        RagService.RagContext ragContext = replyContext.ragContext();
+
+        safeListener.onSources(ragContext.sources());
+        llmChatService.streamAnswer(ragContext.turns(), ragContext.question(), ragContext.fallbackAnswer(), new LlmChatService.GenerationStreamListener() {
+            @Override
+            public void onThinking(String thinking) {
+                try {
+                    safeListener.onThinking(thinking);
+                } catch (RuntimeException exception) {
+                    failure.compareAndSet(null, exception);
+                }
+            }
+
+            @Override
+            public void onDelta(String delta) {
+                try {
+                    safeListener.onDelta(delta);
+                } catch (RuntimeException exception) {
+                    failure.compareAndSet(null, exception);
+                }
+            }
+
+            @Override
+            public void onComplete(LlmChatService.GenerationResult result) {
+                try {
+                    String sourcesJson = writeSources(ragContext.sources());
+                    long assistantMessageId = messageRepository.insert(
+                            conversationId,
+                            "assistant",
+                            result.answer(),
+                            sourcesJson,
+                            result.inputTokens(),
+                            result.outputTokens()
+                    );
+                    conversationRepository.touch(conversationId);
+                    applyTitleUpdateIfNeeded(userId, replyContext);
+                    safeListener.onComplete(new ConversationReply(
+                            assistantMessageId,
+                            result.answer(),
+                            ragContext.sources(),
+                            result.inputTokens(),
+                            result.outputTokens()
+                    ));
+                } catch (RuntimeException exception) {
+                    failure.set(exception);
+                    safeListener.onError(exception);
+                } finally {
+                    completed.countDown();
+                }
+            }
+        });
+
+        try {
+            completed.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("stream reply interrupted", exception);
+        }
+
+        if (failure.get() != null) {
+            throw failure.get();
+        }
     }
 
     public ConversationRecord requireConversation(long userId, long conversationId) {
@@ -178,6 +274,60 @@ public class ConversationService {
 
     private String summarizeTitle(String content) {
         return content.length() <= 24 ? content : content.substring(0, 24);
+    }
+
+    private ReplyContext prepareReplyContext(long userId, long conversationId, String content) {
+        ConversationRecord conversation = requireConversation(userId, conversationId);
+        String trimmed = content == null ? "" : content.trim();
+        if (trimmed.isBlank()) {
+            throw new BusinessException(400, "content 不能为空");
+        }
+
+        // 先保存用户问题，再去调 RAG，这样即使后续模型失败，也能保留完整会话轨迹。
+        long userMessageId = messageRepository.insert(conversationId, "user", trimmed, "[]", estimateTokens(trimmed), null);
+        List<MessageRecord> historyRecords = messageRepository.findByConversationId(conversationId);
+        List<ChatTurn> history = buildHistoryTurns(historyRecords, userMessageId);
+        float[] queryEmbedding = embedQuestion(trimmed);
+
+        return new ReplyContext(
+                trimmed,
+                conversation,
+                ragService.prepareContext(trimmed, queryEmbedding, conversation.kbIds(), history),
+                conversation.messageCount() == 0 || "新建会话".equals(conversation.title())
+        );
+    }
+
+    private List<ChatTurn> buildHistoryTurns(List<MessageRecord> historyRecords, long userMessageId) {
+        List<ChatTurn> history = historyRecords.stream()
+                // 历史消息不包含刚保存的当前 user turn，避免在 prompt 里重复一次当前问题。
+                .filter(message -> message.id() != userMessageId)
+                .map(message -> new ChatTurn(message.role(), message.content()))
+                .toList();
+        int keep = 6;
+        if (history.size() <= keep) {
+            return history;
+        }
+        return new ArrayList<>(history.subList(history.size() - keep, history.size()));
+    }
+
+    private void applyTitleUpdateIfNeeded(long userId, ReplyContext replyContext) {
+        if (!replyContext.shouldUpdateTitle()) {
+            return;
+        }
+        // 首轮对话自动把标题改成问题摘要，方便会话列表展示。
+        conversationRepository.updateTitle(
+                replyContext.conversation().id(),
+                userId,
+                summarizeTitle(replyContext.question())
+        );
+    }
+
+    private float[] embedQuestion(String question) {
+        List<float[]> embeddings = llmChatService.embedTexts(List.of(question));
+        if (embeddings.isEmpty()) {
+            throw new IllegalStateException("query embedding missing");
+        }
+        return embeddings.get(0);
     }
 
     private int estimateTokens(String content) {

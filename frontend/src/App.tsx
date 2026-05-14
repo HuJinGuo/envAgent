@@ -23,6 +23,7 @@ import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { EmptyState } from './components/ui/empty-state';
 import { Input } from './components/ui/input';
+import { adminTabMeta, resolveAdminTab } from './lib/admin-tabs';
 import {
   fallbackWorkspaceRoutes,
   getWorkspaceRouteByPath,
@@ -37,7 +38,9 @@ type VisibleNavigationItem = {
   id: string;
   label: string;
   path: string;
-  route: WorkspaceRouteDefinition;
+  route: WorkspaceRouteDefinition | null;
+  displayRoute: WorkspaceRouteDefinition | null;
+  redirect: string;
   children: VisibleNavigationItem[];
   sortOrder: number;
 };
@@ -59,6 +62,7 @@ type WorkspaceRenderContext = {
   usersQuery: any;
   selectedUser: unknown;
   setUserId: (id: string | null) => void;
+  adminTab: 'roles' | 'menus' | 'knowledgeBases' | 'vendors' | 'models' | 'dictionaries';
 };
 
 const routePropBuilders: Record<WorkspaceRouteKey, (context: WorkspaceRenderContext) => Record<string, unknown>> = {
@@ -113,7 +117,9 @@ const routePropBuilders: Record<WorkspaceRouteKey, (context: WorkspaceRenderCont
     selectedUser: context.selectedUser,
     onSelect: context.setUserId
   }),
-  admin: () => ({})
+  admin: (context) => ({
+    activeTab: context.adminTab
+  })
 };
 
 function getCurrentPathname() {
@@ -157,41 +163,113 @@ function flattenNavigationItems(items: VisibleNavigationItem[]): VisibleNavigati
   return flattened;
 }
 
+function flattenNavigationSource(items: NavigationItem[]): NavigationItem[] {
+  const flattened: NavigationItem[] = [];
+  for (const item of items) {
+    flattened.push({ ...item, children: [] });
+    if (item.children.length) {
+      flattened.push(...flattenNavigationSource(item.children));
+    }
+  }
+  return flattened;
+}
+
+function buildNavigationSourceTree(items: NavigationItem[]): NavigationItem[] {
+  const sorted = [...items].sort((left, right) => left.sortOrder - right.sortOrder);
+  const byParent = new Map<string, NavigationItem[]>();
+  for (const item of sorted) {
+    const key = item.parentId || '';
+    byParent.set(key, [...(byParent.get(key) ?? []), item]);
+  }
+
+  const build = (parentId: string): NavigationItem[] =>
+    (byParent.get(parentId) ?? []).map((item) => ({
+      ...item,
+      children: build(item.id)
+    }));
+
+  return build('');
+}
+
+function normalizeAdminNavigationStructure(items: NavigationItem[]): NavigationItem[] {
+  const flattened = flattenNavigationSource(items);
+  const adminNode = flattened.find((item) => item.code === 'admin');
+  if (!adminNode) {
+    return items;
+  }
+
+  adminNode.path = normalizeWorkspacePath(adminNode.path, '/admin');
+  adminNode.component = '';
+  adminNode.redirect = adminNode.redirect || '/admin/users';
+
+  return buildNavigationSourceTree(flattened);
+}
+
 function resolveNavigationTree(items: NavigationItem[], role?: string | null): VisibleNavigationItem[] {
-  return items
+  return normalizeAdminNavigationStructure(items)
     .map((item) => {
-      const route = resolveWorkspaceRoute(item.section);
-      if (!route || !item.visible || !isVisibleStatus(item.status) || !canAccessRoles(item.roles, role)) {
+      if (!item.visible || !isVisibleStatus(item.status) || !canAccessRoles(item.roles, role)) {
+        return null;
+      }
+
+      const children = resolveNavigationTree(item.children, role);
+      const displayRoute = resolveWorkspaceRoute(item.section, item.component);
+      const hasExplicitComponent = Boolean(item.component?.trim());
+      const route = hasExplicitComponent || !children.length ? displayRoute : null;
+      if (!route && !children.length && !displayRoute) {
         return null;
       }
 
       return {
         id: item.id,
-        label: item.label || item.name || route.meta.label,
-        path: normalizeWorkspacePath(item.path, route.defaultPath),
+        label: item.label || item.name || displayRoute?.meta.label || item.code,
+        path: normalizeWorkspacePath(item.path, displayRoute?.defaultPath ?? '/'),
         route,
+        displayRoute,
+        redirect: item.redirect?.trim() ?? '',
         sortOrder: item.sortOrder,
-        children: resolveNavigationTree(item.children, role)
+        children
       } satisfies VisibleNavigationItem;
     })
     .filter((item): item is VisibleNavigationItem => Boolean(item))
     .sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
-function buildFallbackNavigation(role?: string | null) {
-  return fallbackWorkspaceRoutes
-    .filter((route) => canAccessRoles(route.defaultRoles, role))
-    .map(
-      (route, index) =>
-        ({
-          id: `fallback-${route.key}`,
-          label: route.meta.label,
-          path: route.defaultPath,
-          route,
-          sortOrder: index,
-          children: []
-        }) satisfies VisibleNavigationItem
-    );
+function hasActiveBranch(item: VisibleNavigationItem, activePath: string): boolean {
+  return item.path === activePath || item.children.some((child) => hasActiveBranch(child, activePath));
+}
+
+function findNavigationItemByPath(items: VisibleNavigationItem[], path: string): VisibleNavigationItem | null {
+  for (const item of items) {
+    if (item.path === path) {
+      return item;
+    }
+    const childMatch = findNavigationItemByPath(item.children, path);
+    if (childMatch) {
+      return childMatch;
+    }
+  }
+  return null;
+}
+
+function findFirstNavigablePath(items: VisibleNavigationItem[]): string | null {
+  for (const item of items) {
+    if (item.route) {
+      return item.path;
+    }
+    const childPath = findFirstNavigablePath(item.children);
+    if (childPath) {
+      return childPath;
+    }
+  }
+  return null;
+}
+
+function findFirstNavigablePathForItem(item: VisibleNavigationItem): string | null {
+  if (item.redirect) {
+    return normalizeWorkspacePath(item.redirect, item.path);
+  }
+  return findFirstNavigablePath(item.children);
 }
 
 function useBrowserPathname() {
@@ -225,6 +303,7 @@ function App() {
   const [chatSessionId, setChatSessionId] = useState<string | null>(null);
   const [enterpriseId, setEnterpriseId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [expandedNavIds, setExpandedNavIds] = useState<Record<string, boolean>>({});
 
   const hasSession = Boolean(token);
   const persistedRole = storedUser?.role ?? null;
@@ -254,7 +333,6 @@ function App() {
 
   const activeUser = meQuery.data?.data ?? storedUser;
   const activeRole = activeUser?.role ?? persistedRole;
-  const fallbackNavigation = useMemo(() => buildFallbackNavigation(activeRole), [activeRole]);
   const visibleNavTree = useMemo(() => {
     if (navigationQuery.data?.data?.length) {
       const resolvedTree = resolveNavigationTree(navigationQuery.data.data, activeRole);
@@ -262,12 +340,14 @@ function App() {
         return resolvedTree;
       }
     }
-    return fallbackNavigation;
-  }, [activeRole, fallbackNavigation, navigationQuery.data]);
+    return [];
+  }, [activeRole, navigationQuery.data]);
   const visibleNavItems = useMemo(() => flattenNavigationItems(visibleNavTree), [visibleNavTree]);
-  const activeNavItem = visibleNavItems.find((item) => item.path === pathname) ?? null;
+  const matchedNavItem = useMemo(() => findNavigationItemByPath(visibleNavTree, pathname), [pathname, visibleNavTree]);
+  const activeNavItem = matchedNavItem?.route ? matchedNavItem : null;
   const activeRoute = activeNavItem?.route ?? fallbackRoute;
   const activeRouteKey = activeRoute?.key ?? fallbackRouteKey;
+  const adminTab = useMemo(() => resolveAdminTab(pathname), [pathname]);
 
   const dashboardQuery = useQuery({
     queryKey: ['workspace-dashboard', token],
@@ -357,11 +437,49 @@ function App() {
   }, [hasSession]);
 
   useEffect(() => {
-    if (!hasSession || !visibleNavItems.length || activeNavItem) {
+    if (!visibleNavTree.length) {
       return;
     }
-    navigateToPath(visibleNavItems[0].path, true);
-  }, [activeNavItem, hasSession, visibleNavItems]);
+    setExpandedNavIds((current) => {
+      const next = { ...current };
+      let changed = false;
+      const visit = (items: VisibleNavigationItem[], depth = 0) => {
+        for (const item of items) {
+          if (item.children.length) {
+            const shouldExpand = depth === 0 || hasActiveBranch(item, pathname);
+            if (current[item.id] === undefined || (shouldExpand && !current[item.id])) {
+              next[item.id] = shouldExpand;
+              changed = true;
+            }
+            visit(item.children, depth + 1);
+          }
+        }
+      };
+      visit(visibleNavTree);
+      return changed ? next : current;
+    });
+  }, [pathname, visibleNavTree]);
+
+  useEffect(() => {
+    if (!hasSession || !visibleNavTree.length) {
+      return;
+    }
+
+    if (matchedNavItem && !matchedNavItem.route) {
+      const nextPath = findFirstNavigablePathForItem(matchedNavItem);
+      if (nextPath && nextPath !== pathname) {
+        navigateToPath(nextPath, true);
+      }
+      return;
+    }
+
+    if (!matchedNavItem) {
+      const firstPath = findFirstNavigablePath(visibleNavTree);
+      if (firstPath) {
+        navigateToPath(firstPath, true);
+      }
+    }
+  }, [hasSession, matchedNavItem, pathname, visibleNavTree]);
 
   useEffect(() => {
     if (!enterpriseId && sourceQuery.data?.data.enterprises.length) {
@@ -405,8 +523,10 @@ function App() {
     clearProtectedQueries();
   };
 
-  const activeMeta = activeNavItem?.route.meta ?? activeRoute?.meta ?? fallbackWorkspaceRoutes[0].meta;
-  const activeLabel = activeNavItem?.label ?? activeMeta.label;
+  const activeMeta = activeNavItem?.displayRoute?.meta ?? matchedNavItem?.displayRoute?.meta ?? activeRoute?.meta ?? fallbackWorkspaceRoutes[0].meta;
+  const adminMeta = activeRouteKey === 'admin' ? adminTabMeta[adminTab] : null;
+  const activeLabel = adminMeta?.label ?? matchedNavItem?.label ?? activeMeta.label;
+  const isChatRoute = activeRouteKey === 'chat';
   const ActiveComponent = activeRoute?.Component ?? null;
   const renderContext: WorkspaceRenderContext = {
     dashboardQuery,
@@ -424,7 +544,8 @@ function App() {
     monitorQuery,
     usersQuery,
     selectedUser,
-    setUserId
+    setUserId,
+    adminTab
   };
 
   return (
@@ -432,42 +553,44 @@ function App() {
       <div className="app-noise" />
       <aside className="border-b border-white/10 bg-[#081214]/92 backdrop-blur md:border-b-0 md:border-r">
         <div className="flex h-full flex-col px-4 py-5">
-          <div className="space-y-5">
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="space-y-4">
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-3.5">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d7ff64] text-[#11211e] shadow-[0_0_34px_rgba(215,255,100,0.22)]">
-                  <ShieldCheck className="h-5 w-5" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d7ff64] text-[#11211e] shadow-[0_0_34px_rgba(215,255,100,0.22)]">
+                  <ShieldCheck className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="font-display text-xl text-white">环境监管 AI 助手</p>
-                  <p className="text-xs text-white/45">Internal Operations Console</p>
+                <div className="min-w-0">
+                  <p className="font-display text-lg font-semibold text-white">环境监管 AI 助手</p>
+                  <p className="text-[11px] text-white/45">AI Operations Console</p>
                 </div>
               </div>
             </div>
 
-            <nav className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2">
+            <nav className="space-y-2 overflow-y-auto pb-1 pr-1">
               {visibleNavTree.map((item) => (
                 <SidebarNavNode
                   key={item.id}
                   item={item}
                   activePath={pathname}
+                  expandedIds={expandedNavIds}
                   onSelect={(path) =>
                     startTransition(() => {
                       navigateToPath(path);
                     })
                   }
+                  onToggle={(id) => setExpandedNavIds((current) => ({ ...current, [id]: !current[id] }))}
                 />
               ))}
             </nav>
           </div>
 
-          <div className="mt-5 space-y-3 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 md:mt-auto">
+          <div className="mt-4 space-y-3 rounded-[28px] border border-white/10 bg-white/[0.03] p-3.5 md:mt-auto">
             <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-[0.22em] text-white/40">账户</span>
+              <span className="text-[11px] uppercase tracking-[0.18em] text-white/40">账户</span>
               <Badge tone={activeUser ? 'good' : 'neutral'}>{activeUser ? '已登录' : '待认证'}</Badge>
             </div>
             {activeUser ? (
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-white">{activeUser.username}</div>
@@ -480,9 +603,9 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-black/15 p-4">
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-black/15 p-3">
                 <label className="space-y-2">
-                  <span className="text-xs uppercase tracking-[0.2em] text-white/40">用户名</span>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40">用户名</span>
                   <Input
                     value={credentials.username}
                     onChange={(event) => setCredential('username', event.target.value)}
@@ -490,7 +613,7 @@ function App() {
                   />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs uppercase tracking-[0.2em] text-white/40">密码</span>
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-white/40">密码</span>
                   <Input
                     type="password"
                     value={credentials.password}
@@ -514,10 +637,10 @@ function App() {
       </aside>
 
       <main className="min-w-0">
-        <header className="border-b border-white/10 px-5 py-5 md:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
+        <header className={cn('border-b border-white/10', isChatRoute ? 'px-4 py-3 md:px-6 md:py-4' : 'px-5 py-5 md:px-8')}>
+          <div className={cn('flex flex-col gap-3 xl:flex-row xl:justify-between', isChatRoute ? 'xl:items-center' : 'xl:items-start')}>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="neutral">{activeLabel}</Badge>
                 <Badge tone={healthQuery.data?.data.status === 'UP' ? 'good' : 'warn'}>
                   {healthQuery.data?.data.status ?? '未连接'}
@@ -525,32 +648,44 @@ function App() {
                 {isSwitching ? <span className="text-xs text-white/40">视图切换中</span> : null}
               </div>
               <div>
-                <h1 className="font-display text-3xl text-white md:text-5xl">{activeMeta.title}</h1>
-                <p className="mt-3 max-w-4xl text-sm leading-7 text-white/58 md:text-base">{activeMeta.description}</p>
+                <h1 className={cn('font-display text-white', isChatRoute ? 'text-[28px] md:text-[34px]' : 'text-3xl md:text-5xl')}>
+                  {adminMeta?.title ?? activeMeta.title}
+                </h1>
+                <p className={cn('max-w-4xl text-sm leading-6 text-white/58', isChatRoute ? 'mt-1 max-w-3xl' : 'mt-2 md:text-base')}>
+                  {adminMeta?.description ?? activeMeta.description}
+                </p>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[540px]">
-              <TopStat
-                label="系统状态"
-                value={healthQuery.data?.data.status ?? '--'}
-                note={healthQuery.isError ? 'health 接口异常' : '读取 /api/system/health'}
-              />
-              <TopStat
-                label="当前模型"
-                value={healthQuery.data?.data.chatModel ?? '--'}
-                note={healthQuery.data?.data.embeddingModel ?? '等待连接'}
-              />
-              <TopStat
-                label="向量维度"
-                value={healthQuery.data ? String(healthQuery.data.data.vectorDimensions) : '--'}
-                note={activeUser ? `已登录 ${activeUser.username}` : '当前未登录'}
-              />
-            </div>
+            {isChatRoute ? (
+              <div className="flex flex-wrap items-center gap-2 xl:max-w-[460px] xl:justify-end">
+                <HeaderMetricChip label="系统状态" value={healthQuery.data?.data.status ?? '--'} />
+                <HeaderMetricChip label="当前模型" value={healthQuery.data?.data.chatModel ?? '--'} />
+                <HeaderMetricChip label="向量维度" value={healthQuery.data ? String(healthQuery.data.data.vectorDimensions) : '--'} />
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[480px]">
+                <TopStat
+                  label="系统状态"
+                  value={healthQuery.data?.data.status ?? '--'}
+                  note={healthQuery.isError ? 'health 接口异常' : '读取 /api/system/health'}
+                />
+                <TopStat
+                  label="当前模型"
+                  value={healthQuery.data?.data.chatModel ?? '--'}
+                  note={healthQuery.data?.data.embeddingModel ?? '等待连接'}
+                />
+                <TopStat
+                  label="向量维度"
+                  value={healthQuery.data ? String(healthQuery.data.data.vectorDimensions) : '--'}
+                  note={activeUser ? `已登录 ${activeUser.username}` : '当前未登录'}
+                />
+              </div>
+            )}
           </div>
         </header>
 
-        <div className="space-y-5 px-5 py-5 md:px-8 md:py-7">
+        <div className={cn('space-y-5 px-5 py-5 md:px-8 md:py-7', isChatRoute && 'space-y-4 px-4 py-4 md:px-6 md:py-4')}>
           {!hasSession ? (
             <EmptyState
               icon={ShieldCheck}
@@ -578,34 +713,59 @@ function App() {
   );
 }
 
+function HeaderMetricChip(props: { label: string; value: string }) {
+  return (
+    <div className="rounded-full border border-[#dbe7f3] bg-white/80 px-3 py-1.5 text-xs text-[#475569] backdrop-blur">
+      <span className="text-[#94a3b8]">{props.label}</span>
+      <span className="ml-2 font-semibold text-[#1f2937]">{props.value}</span>
+    </div>
+  );
+}
+
 function SidebarNavNode(props: {
   item: VisibleNavigationItem;
   activePath: string;
+  expandedIds: Record<string, boolean>;
   onSelect: (path: string) => void;
+  onToggle: (id: string) => void;
   depth?: number;
 }) {
   const depth = props.depth ?? 0;
   const active = props.activePath === props.item.path;
+  const activeBranch = hasActiveBranch(props.item, props.activePath);
+  const hasChildren = props.item.children.length > 0;
+  const expanded = hasChildren ? props.expandedIds[props.item.id] !== false : false;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-0.5">
       <SidebarNavButton
         route={props.item.route}
+        displayRoute={props.item.displayRoute}
         label={props.item.label}
-        hint={props.item.path}
         active={active}
+        ancestorActive={!active && activeBranch}
+        expanded={expanded}
+        hasChildren={hasChildren}
         depth={depth}
-        onSelect={() => props.onSelect(props.item.path)}
+        onSelect={() => {
+          if (hasChildren && !props.item.route) {
+            props.onToggle(props.item.id);
+            return;
+          }
+          props.onSelect(props.item.path);
+        }}
       />
-      {props.item.children.length ? (
-        <div className="space-y-2">
+      {hasChildren && expanded ? (
+        <div className="ml-4 border-l border-[#e2e8f0] pl-2">
           {props.item.children.map((child) => (
             <SidebarNavNode
               key={child.id}
               item={child}
               depth={depth + 1}
               activePath={props.activePath}
+              expandedIds={props.expandedIds}
               onSelect={props.onSelect}
+              onToggle={props.onToggle}
             />
           ))}
         </div>
@@ -615,36 +775,44 @@ function SidebarNavNode(props: {
 }
 
 function SidebarNavButton(props: {
-  route: WorkspaceRouteDefinition;
+  route: WorkspaceRouteDefinition | null;
+  displayRoute: WorkspaceRouteDefinition | null;
   label: string;
-  hint: string;
   active: boolean;
+  ancestorActive: boolean;
+  expanded: boolean;
+  hasChildren: boolean;
   onSelect: () => void;
   depth?: number;
 }) {
-  const Icon = props.route.meta.icon;
+  const Icon = props.displayRoute?.meta.icon ?? ShieldCheck;
+  const isDirectory = props.hasChildren && !props.route;
   return (
     <button
       type="button"
       onClick={props.onSelect}
       className={cn(
-        'flex min-w-[198px] items-center justify-between rounded-2xl border px-3 py-3 text-left transition md:w-full md:min-w-0',
+        'flex min-h-[38px] w-full items-center justify-between rounded border px-3 py-2 text-left transition',
         props.active
-          ? 'border-[#d7ff64]/50 bg-[#d7ff64]/12 text-white'
-          : 'border-white/10 bg-white/[0.03] text-white/68 hover:border-white/18 hover:bg-white/[0.05]'
+          ? 'border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]'
+          : props.ancestorActive
+            ? 'border-[#dbeafe] bg-[#f8fbff] text-[#2563eb]'
+            : 'border-transparent bg-transparent text-[#475569] hover:border-[#e5edf6] hover:bg-[#f8fbff] hover:text-[#2563eb]'
       )}
-      style={{ marginLeft: (props.depth ?? 0) * 14 }}
+      style={{ paddingLeft: 12 + (props.depth ?? 0) * 8 }}
     >
-      <span className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/20">
-          <Icon className="h-4 w-4" />
+      <span className="flex min-w-0 items-center gap-2.5">
+        <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded', isDirectory ? 'bg-[#f8fafc]' : 'bg-[#f1f5f9]')}>
+          <Icon className="h-3.5 w-3.5" />
         </span>
-        <span>
-          <span className="block text-sm font-medium">{props.label}</span>
-          <span className="block text-xs text-white/42">{props.hint}</span>
-        </span>
+        <span className="truncate text-sm font-medium">{props.label}</span>
       </span>
-      <ChevronRight className="h-4 w-4 opacity-50" />
+      {props.hasChildren ? (
+        <span className="flex items-center gap-1.5 text-[11px] text-[#94a3b8]">
+          {isDirectory ? `${props.expanded ? '收起' : '展开'}` : null}
+          <ChevronRight className={cn('h-4 w-4 transition', props.expanded && 'rotate-90')} />
+        </span>
+      ) : null}
     </button>
   );
 }

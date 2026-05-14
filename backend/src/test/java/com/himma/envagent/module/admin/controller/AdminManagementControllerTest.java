@@ -48,13 +48,15 @@ class AdminManagementControllerTest {
                                   "code": "test-vendor",
                                   "name": "Test Vendor",
                                   "baseUrl": "http://127.0.0.1:18000/v1",
+                                  "apiKey": "sk-test-1234567890",
                                   "enabled": true,
                                   "sortOrder": 99
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.code").value("test-vendor"));
+                .andExpect(jsonPath("$.data.code").value("test-vendor"))
+                .andExpect(jsonPath("$.data.apiKeyMasked").value("sk-****7890"));
     }
 
     @Test

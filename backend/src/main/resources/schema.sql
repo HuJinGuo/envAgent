@@ -66,12 +66,28 @@ CREATE TABLE IF NOT EXISTS model_vendors (
     code VARCHAR(64) NOT NULL UNIQUE,
     name VARCHAR(128) NOT NULL,
     base_url VARCHAR(512),
+    api_key TEXT,
     api_key_masked VARCHAR(128),
     description TEXT,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE model_vendors ADD COLUMN IF NOT EXISTS api_key TEXT;
+ALTER TABLE model_vendors ADD COLUMN IF NOT EXISTS api_key_masked VARCHAR(128);
+
+CREATE TABLE IF NOT EXISTS sys_dict_items (
+    id BIGSERIAL PRIMARY KEY,
+    dict_type VARCHAR(64) NOT NULL,
+    dict_label VARCHAR(128) NOT NULL,
+    dict_value VARCHAR(128) NOT NULL,
+    description TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (dict_type, dict_value)
 );
 
 CREATE TABLE IF NOT EXISTS ai_models (
@@ -160,4 +176,5 @@ CREATE INDEX IF NOT EXISTS idx_async_tasks_ref ON async_tasks(task_type, ref_id)
 CREATE INDEX IF NOT EXISTS idx_sys_role_menus_role ON sys_role_menus(role_id);
 CREATE INDEX IF NOT EXISTS idx_sys_role_menus_menu ON sys_role_menus(menu_id);
 CREATE INDEX IF NOT EXISTS idx_ai_models_vendor ON ai_models(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_sys_dict_items_type ON sys_dict_items(dict_type);
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

@@ -11,7 +11,7 @@ public final class AdminPayloads {
     }
 
     public record RoleItem(Long id, String code, String name, String description, Integer sortOrder,
-                           Boolean enabled, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                           Boolean enabled, List<Long> menuIds, LocalDateTime createdAt, LocalDateTime updatedAt) {
     }
 
     public record RoleRequest(@NotBlank String code, @NotBlank String name, String description,
@@ -36,16 +36,32 @@ public final class AdminPayloads {
     public record RoleMenusRequest(@NotNull List<Long> menuIds) {
     }
 
+    public record UserItem(Long id, String username, String roleCode, String roleName, String dept, String status,
+                           LocalDateTime lastLoginAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    }
+
+    public record UserRequest(@NotBlank String username, String password, @NotBlank String roleCode,
+                              String dept, String status) {
+    }
+
+    public record DictItem(Long id, String dictType, String dictLabel, String dictValue, String description,
+                           Boolean enabled, Integer sortOrder, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    }
+
+    public record DictRequest(@NotBlank String dictType, @NotBlank String dictLabel, @NotBlank String dictValue,
+                              String description, Boolean enabled, Integer sortOrder) {
+    }
+
     public record VendorItem(Long id, String code, String name, String baseUrl, String apiKeyMasked,
                              String description, Boolean enabled, Integer sortOrder, LocalDateTime createdAt,
                              LocalDateTime updatedAt) {
     }
 
-    public record VendorRequest(@NotBlank String code, @NotBlank String name, String baseUrl, String apiKeyMasked,
+    public record VendorRequest(@NotBlank String code, @NotBlank String name, String baseUrl, String apiKey,
                                 String description, Boolean enabled, Integer sortOrder) {
     }
 
-    public record ModelItem(Long id, Long vendorId, String code, String name, String modelType,
+    public record ModelItem(Long id, Long vendorId, String vendorName, String code, String name, String modelType,
                             Integer contextWindow, Integer maxOutputTokens, Boolean enabled, Integer sortOrder,
                             LocalDateTime createdAt, LocalDateTime updatedAt) {
     }

@@ -11,6 +11,8 @@ public class DocumentChunkRow {
     private Integer chunkIndex;
     private Integer tokenCount;
     private String embedding;
+    private String metadata;
+    private java.time.LocalDateTime createdAt;
     private Double score;
 
     public Long getId() {
@@ -83,6 +85,22 @@ public class DocumentChunkRow {
 
     public void setEmbedding(String embedding) {
         this.embedding = embedding;
+    }
+
+    public String getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(String metadata) {
+        this.metadata = metadata;
+    }
+
+    public java.time.LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(java.time.LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public Double getScore() {

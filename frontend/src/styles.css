@@ -1,21 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-display: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-display: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 :root {
   color-scheme: light;
-  --color-primary: #409eff;
-  --color-primary-soft: #ecf5ff;
-  --color-bg: #f5f7fa;
+  --color-primary: #3b82f6;
+  --color-primary-strong: #2563eb;
+  --color-primary-soft: #eff6ff;
+  --color-bg: #f5f7fb;
+  --color-sidebar: #ffffff;
   --color-surface: #ffffff;
-  --color-border: #dcdfe6;
-  --color-border-light: #ebeef5;
-  --color-text: #303133;
-  --color-text-regular: #606266;
-  --color-text-secondary: #909399;
+  --color-surface-soft: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-strong: #d6dee8;
+  --color-text: #1f2937;
+  --color-text-regular: #475569;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
 }
 
 * {
@@ -38,15 +42,18 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 280px minmax(0, 1fr);
-  background: var(--color-bg);
+  grid-template-columns: 236px minmax(0, 1fr);
+  background:
+    linear-gradient(180deg, #f8fbff 0%, #f5f7fb 180px),
+    var(--color-bg);
 }
 
 .app-noise,
@@ -60,54 +67,67 @@ textarea {
   top: 0;
   z-index: 20;
   height: 100vh;
-  overflow: auto;
+  overflow: hidden;
   border-right: 1px solid var(--color-border);
-  background: var(--color-surface) !important;
+  background: var(--color-sidebar) !important;
 }
 
 .app-shell > aside > div {
-  gap: 18px;
-  padding: 16px 14px;
+  gap: 14px;
+  padding: 12px;
 }
 
 .app-shell > aside > div > div:first-child > div:first-child,
 .app-shell > aside > div > div:last-child {
-  border: 1px solid var(--color-border-light) !important;
-  border-radius: 4px !important;
-  background: #fafafa !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  background: var(--color-surface) !important;
+  box-shadow: none !important;
 }
 
 .app-shell > aside nav {
-  gap: 6px;
-  scrollbar-width: none;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #d7dee8 transparent;
 }
 
 .app-shell > aside nav::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.app-shell > aside nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #d7dee8;
 }
 
 .app-shell > aside nav button {
-  min-height: 44px;
-  border-radius: 4px !important;
-  border-color: transparent !important;
+  min-height: 38px;
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
   background: transparent !important;
   color: var(--color-text-regular) !important;
 }
 
 .app-shell > aside nav button:hover {
   background: var(--color-primary-soft) !important;
-  color: var(--color-primary) !important;
+  color: var(--color-primary-strong) !important;
 }
 
-.app-shell > aside nav button[class*="d7ff64"] {
-  border-color: #b3d8ff !important;
-  background: var(--color-primary-soft) !important;
-  color: var(--color-primary) !important;
+.app-shell > aside nav button[class*="d7ff64"],
+.app-shell > aside nav button[class*="eaf2ff"],
+.app-shell > aside nav button[class*="bg-white/[0.06]"] {
+  border-color: #bfdbfe !important;
+  background: #eff6ff !important;
+  color: var(--color-primary-strong) !important;
+}
+
+.app-shell > aside nav button svg {
+  color: currentColor;
 }
 
 .app-shell > main {
   min-width: 0;
-  background: var(--color-bg);
+  background: transparent;
 }
 
 .app-shell > main > header {
@@ -115,14 +135,14 @@ textarea {
   top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--color-border) !important;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 18px 24px !important;
+  background: rgba(245, 247, 251, 0.88);
+  padding: 14px 20px !important;
   backdrop-filter: blur(8px);
 }
 
 .app-shell > main > header h1 {
   color: var(--color-text) !important;
-  font-size: 24px !important;
+  font-size: 28px !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
 }
@@ -130,32 +150,38 @@ textarea {
 .app-shell > main > header p {
   color: var(--color-text-secondary) !important;
   font-size: 13px !important;
-  line-height: 1.7 !important;
+  line-height: 1.65 !important;
 }
 
 .app-shell > main > div {
-  padding: 20px 24px 28px !important;
+  padding: 16px 20px 22px !important;
 }
 
 .app-shell thead {
-  background: #f5f7fa !important;
+  background: #f8fafc !important;
   color: var(--color-text-secondary) !important;
 }
 
 .app-shell th {
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border);
   color: var(--color-text-regular) !important;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600 !important;
 }
 
 .app-shell td {
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid #edf2f7;
   color: var(--color-text-regular) !important;
 }
 
 .app-shell tr:hover td {
-  background: #fafcff;
+  background: #f8fbff;
+}
+
+.app-shell textarea,
+.app-shell input,
+.app-shell select {
+  color: var(--color-text) !important;
 }
 
 .app-shell [class*="text-white"] {
@@ -167,12 +193,14 @@ textarea {
 }
 
 .app-shell [class*="border-white"] {
-  border-color: var(--color-border-light) !important;
+  border-color: var(--color-border) !important;
 }
 
 .app-shell [class*="bg-white/"],
 .app-shell [class*="bg-black/"],
-.app-shell [class*="bg-[#081214"] {
+.app-shell [class*="bg-[#081214"],
+.app-shell [class*="bg-[#0f314a"],
+.app-shell [class*="bg-[#173544"] {
   background: var(--color-surface) !important;
 }
 
@@ -187,7 +215,7 @@ textarea {
 .app-shell [class*="rounded-[24px]"],
 .app-shell [class*="rounded-2xl"],
 .app-shell [class*="rounded-xl"] {
-  border-radius: 4px !important;
+  border-radius: 8px !important;
 }
 
 .app-shell [class*="shadow-"] {
@@ -195,15 +223,323 @@ textarea {
 }
 
 .app-shell [class*="border-amber"] {
-  border-color: #f3d19e !important;
-  background: #fdf6ec !important;
-  color: #a66a00 !important;
+  border-color: #f7d9a4 !important;
+  background: #fff9ed !important;
+  color: #b7791f !important;
 }
 
 .app-shell [class*="border-emerald"] {
-  border-color: #c2e7b0 !important;
-  background: #f0f9eb !important;
-  color: #3f8f20 !important;
+  border-color: #b7e4c7 !important;
+  background: #edfdf3 !important;
+  color: #15803d !important;
+}
+
+.workspace-table {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.workspace-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.workspace-subtle {
+  background: var(--color-surface-soft);
+}
+
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #c7d5e4 transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c7d5e4;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #aebfd3;
+}
+
+.rich-content {
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.rich-content > :first-child {
+  margin-top: 0;
+}
+
+.rich-content > :last-child {
+  margin-bottom: 0;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+  margin: 0 0 12px;
+  color: #1f2937;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.rich-content h1 {
+  font-size: 24px;
+}
+
+.rich-content h2 {
+  font-size: 22px;
+}
+
+.rich-content h3 {
+  font-size: 20px;
+}
+
+.rich-content h4 {
+  font-size: 18px;
+}
+
+.rich-content h5,
+.rich-content h6 {
+  font-size: 16px;
+}
+
+.rich-content p,
+.rich-content ul,
+.rich-content ol,
+.rich-content blockquote,
+.rich-content pre,
+.rich-content .rich-content__table-wrap {
+  margin: 0 0 12px;
+}
+
+.rich-content ul,
+.rich-content ol {
+  padding-left: 22px;
+}
+
+.rich-content li + li {
+  margin-top: 6px;
+}
+
+.rich-content blockquote {
+  border-left: 3px solid #93c5fd;
+  background: #f8fbff;
+  padding: 10px 12px;
+  color: #475569;
+}
+
+.rich-content code {
+  border-radius: 6px;
+  background: #eff6ff;
+  padding: 2px 6px;
+  font-family: "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
+  font-size: 12px;
+  color: #1d4ed8;
+}
+
+.rich-content pre {
+  overflow-x: auto;
+  border: 1px solid #dbe7f3;
+  border-radius: 12px;
+  background: #0f172a;
+  padding: 14px;
+}
+
+.rich-content pre code {
+  display: block;
+  background: transparent;
+  padding: 0;
+  color: #e2e8f0;
+  line-height: 1.8;
+}
+
+.rich-content .rich-content__code-lang {
+  margin-bottom: 10px;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rich-content .rich-content__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe7f3;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.rich-content table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.rich-content th,
+.rich-content td {
+  border-bottom: 1px solid #edf2f7;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+}
+
+.rich-content thead th {
+  background: #f8fbff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rich-content a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.rich-content a:hover {
+  text-decoration: underline;
+}
+
+.rich-content hr {
+  border: 0;
+  border-top: 1px solid #dbe7f3;
+}
+
+.rich-content--thinking {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.rich-content--thinking h1,
+.rich-content--thinking h2,
+.rich-content--thinking h3,
+.rich-content--thinking h4,
+.rich-content--thinking h5,
+.rich-content--thinking h6 {
+  color: #334155;
+  font-size: 15px;
+}
+
+.thinking-panel {
+  overflow: hidden;
+  border: 1px solid #dbe7f3;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(248, 250, 252, 0.98) 100%);
+}
+
+.thinking-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(191, 219, 254, 0.75);
+}
+
+.thinking-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.thinking-panel__pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow: 0 0 0 rgba(37, 99, 235, 0.42);
+  animation: thinking-pulse 1.8s ease-out infinite;
+}
+
+.thinking-panel__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.thinking-panel__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #60a5fa;
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.thinking-panel__dots span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.thinking-panel__dots span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.thinking-panel__body,
+.thinking-panel__placeholder {
+  padding: 12px;
+}
+
+.thinking-panel__body {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.thinking-panel__placeholder {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+@keyframes thinking-pulse {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.42);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+  }
+
+  100% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+@keyframes thinking-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -225,7 +561,7 @@ textarea {
   }
 
   .app-shell > aside nav button {
-    min-width: 168px !important;
+    min-width: 156px !important;
   }
 }
 
@@ -237,6 +573,6 @@ textarea {
   }
 
   .app-shell > main > header h1 {
-    font-size: 20px !important;
+    font-size: 22px !important;
   }
 }

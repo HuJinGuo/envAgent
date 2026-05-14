@@ -5,16 +5,14 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("model_vendors")
-public class ModelVendorEntity {
+@TableName("sys_dict_items")
+public class SysDictItemEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String code;
-    private String name;
-    private String baseUrl;
-    private String apiKey;
-    private String apiKeyMasked;
+    private String dictType;
+    private String dictLabel;
+    private String dictValue;
     private String description;
     private Boolean enabled;
     private Integer sortOrder;
@@ -23,16 +21,12 @@ public class ModelVendorEntity {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getBaseUrl() { return baseUrl; }
-    public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
-    public String getApiKey() { return apiKey; }
-    public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-    public String getApiKeyMasked() { return apiKeyMasked; }
-    public void setApiKeyMasked(String apiKeyMasked) { this.apiKeyMasked = apiKeyMasked; }
+    public String getDictType() { return dictType; }
+    public void setDictType(String dictType) { this.dictType = dictType; }
+    public String getDictLabel() { return dictLabel; }
+    public void setDictLabel(String dictLabel) { this.dictLabel = dictLabel; }
+    public String getDictValue() { return dictValue; }
+    public void setDictValue(String dictValue) { this.dictValue = dictValue; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public Boolean getEnabled() { return enabled; }

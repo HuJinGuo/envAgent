@@ -10,6 +10,8 @@ public record DocumentChunkRecord(
         int chunkIndex,
         int tokenCount,
         String embedding,
+        String metadataJson,
+        java.time.LocalDateTime createdAt,
         double score
 ) {
 }

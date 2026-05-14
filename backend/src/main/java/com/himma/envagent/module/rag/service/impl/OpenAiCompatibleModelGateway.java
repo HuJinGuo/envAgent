@@ -9,11 +9,14 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import dev.langchain4j.model.output.Response;
 import dev.langchain4j.model.output.TokenUsage;
 import com.himma.envagent.module.rag.service.ModelGateway;
@@ -36,6 +39,8 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
     private static final Pattern WORD_PATTERN = Pattern.compile("[\\p{L}\\p{N}]+");
 
     private final ChatModel chatModel;
+    private final StreamingChatModel streamingChatModel;
+
     private final EmbeddingModel embeddingModel;
     private final VectorProperties vectorProperties;
     private final AtomicBoolean embeddingRemoteEnabled = new AtomicBoolean(true);
@@ -68,6 +73,12 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
                 .modelName(openAiProperties.getChatModel())
                 .temperature(0.2)
                 .maxRetries(1)
+                .build();
+        this.streamingChatModel = OpenAiStreamingChatModel.builder()
+                .baseUrl(chatBaseUrl)
+                .apiKey(chatApiKey)
+                .modelName(openAiProperties.getChatModel())
+                .temperature(0.2)
                 .build();
         this.embeddingModel = buildEmbeddingModel(openAiProperties, embeddingBaseUrl, embeddingApiKey);
     }
@@ -116,11 +127,68 @@ public class OpenAiCompatibleModelGateway implements ModelGateway {
             throw new IllegalStateException("chat completion content missing");
         }
         TokenUsage tokenUsage = response.tokenUsage();
+        // 到这里说明“完整回答”已经拿到手了，下面只是把 SDK 返回格式转成项目内部格式。
         return new ChatResult(
                 response.aiMessage().text(),
                 tokenUsage == null ? null : tokenUsage.inputTokenCount(),
                 tokenUsage == null ? null : tokenUsage.outputTokenCount()
         );
+    }
+
+    @Override
+    public void chatResultStream(List<ChatTurn> turns, ChatStreamListener listener) {
+        // StreamingChatModel 和同步 ChatModel 不一样：
+        // 它不能直接吃项目里的 ChatTurn，需要先转换成 SDK 的 ChatMessage 列表。
+        //
+        // 也就是说：
+        // - ChatTurn      是项目内部抽象
+        // - ChatMessage   是 LangChain4j / OpenAI 侧真正执行时使用的消息对象
+        List<ChatMessage> messages = toChatMessages(turns);
+        ChatStreamListener safeListener = listener == null ? new ChatStreamListener() {
+        } : listener;
+
+        // 这里先把最底层流式能力接出来，暂时只处理 complete / error，
+        // 真正让前端“边生成边显示”的关键，就是 onPartialResponse 这里要立即向上抛 delta。
+        streamingChatModel.chat(messages, new StreamingChatResponseHandler() {
+            @Override
+            public void onPartialResponse(String partialResponse) {
+                if (partialResponse == null || partialResponse.isEmpty()) {
+                    return;
+                }
+                safeListener.onDelta(partialResponse);
+            }
+
+            @Override
+            public void onPartialThinking(dev.langchain4j.model.chat.response.PartialThinking partialThinking) {
+                if (partialThinking == null || partialThinking.text() == null || partialThinking.text().isBlank()) {
+                    return;
+                }
+                safeListener.onThinking(partialThinking.text());
+            }
+
+            @Override
+            public void onCompleteResponse(ChatResponse completeResponse) {
+                if (completeResponse == null || completeResponse.aiMessage() == null) {
+                    log.warn("streaming chat completed without aiMessage");
+                    safeListener.onComplete(new ChatResult("", null, null));
+                    return;
+                }
+                String answer = completeResponse.aiMessage().text() == null ? "" : completeResponse.aiMessage().text();
+                TokenUsage tokenUsage = completeResponse.tokenUsage();
+                log.debug("streaming chat completed, answerLength={}", answer.length());
+                safeListener.onComplete(new ChatResult(
+                        answer,
+                        tokenUsage == null ? null : tokenUsage.inputTokenCount(),
+                        tokenUsage == null ? null : tokenUsage.outputTokenCount()
+                ));
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                log.error("streaming chat failed", error);
+                safeListener.onError(error);
+            }
+        });
     }
 
     private List<float[]> remoteEmbeddings(List<String> texts) {

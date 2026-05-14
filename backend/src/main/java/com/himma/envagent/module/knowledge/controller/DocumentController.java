@@ -6,6 +6,7 @@ import com.himma.envagent.module.auth.domain.UserRole;
 import com.himma.envagent.module.auth.domain.UserEntity;
 import com.himma.envagent.module.auth.service.UserService;
 import com.himma.envagent.module.knowledge.service.DocumentService;
+import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentChunkItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentStatusItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.UploadDocumentResponse;
@@ -40,9 +41,12 @@ public class DocumentController {
     }
 
     @GetMapping
-    public ApiResponse<List<DocumentItem>> list(Authentication authentication) {
+    public ApiResponse<List<DocumentItem>> list(
+            @RequestParam(value = "knowledgeBaseId", required = false) Long knowledgeBaseId,
+            Authentication authentication
+    ) {
         workspaceAccessService.requireRoles(authentication, "知识库文档接口", UserRole.ANALYST, UserRole.ADMIN);
-        return ApiResponse.success(documentService.list());
+        return ApiResponse.success(documentService.list(knowledgeBaseId));
     }
 
     @PostMapping("/upload")
@@ -67,6 +71,12 @@ public class DocumentController {
     public ApiResponse<DocumentStatusItem> status(@PathVariable("id") long documentId, Authentication authentication) {
         workspaceAccessService.requireRoles(authentication, "知识库文档状态接口", UserRole.ANALYST, UserRole.ADMIN);
         return ApiResponse.success(documentService.getStatus(documentId));
+    }
+
+    @GetMapping("/{id}/chunks")
+    public ApiResponse<List<DocumentChunkItem>> chunks(@PathVariable("id") long documentId, Authentication authentication) {
+        workspaceAccessService.requireRoles(authentication, "知识库切片详情接口", UserRole.ANALYST, UserRole.ADMIN);
+        return ApiResponse.success(documentService.listChunks(documentId));
     }
 
     @DeleteMapping("/{id}")

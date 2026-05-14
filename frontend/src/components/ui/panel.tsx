@@ -7,26 +7,25 @@ type PanelProps = {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  contentClassName?: string;
 };
 
-export function Panel({ title, description, action, children, className }: PanelProps) {
+export function Panel({ title, description, action, children, className, contentClassName }: PanelProps) {
   return (
     <section
       className={cn(
-        'relative overflow-hidden rounded border border-[#dcdfe6] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] md:p-6',
-        'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-[#409eff] before:content-[""]',
+        'rounded border border-[#e2e8f0] bg-white p-4 md:p-5',
         className
       )}
     >
-      <div className="flex flex-col gap-4 pb-5 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-2">
-          <div className="h-1 w-14 rounded bg-[#409eff]" />
-          <h2 className="text-xl font-semibold leading-tight text-[#303133] md:text-[1.375rem]">{title}</h2>
-          {description ? <p className="max-w-2xl text-sm leading-6 text-[#606266]">{description}</p> : null}
+      <div className="flex flex-col gap-3 border-b border-[#edf2f7] pb-3 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold leading-tight text-[#1f2937]">{title}</h2>
+          {description ? <p className="max-w-2xl text-sm leading-6 text-[#64748b]">{description}</p> : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
-      {children}
+      <div className={cn('pt-4', contentClassName)}>{children}</div>
     </section>
   );
 }

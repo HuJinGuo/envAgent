@@ -91,6 +91,7 @@ export type ConversationMessage = {
   createdAt?: string;
   citations?: string[];
   sources?: ReferenceCard[];
+  reasoning?: string;
 };
 
 export type ChatMessage = ConversationMessage;
@@ -131,6 +132,25 @@ export type KnowledgeDocument = {
   isTerminal: boolean;
   knowledgeBaseId?: string;
   knowledgeBaseName?: string;
+  errorMessage?: string;
+};
+
+export type KnowledgeDocumentChunk = {
+  id: string;
+  documentId: string;
+  documentName: string;
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  content: string;
+  chunkIndex: number;
+  tokenCount: number;
+  chunkType: string;
+  pageNo?: number | null;
+  headingPath: string[];
+  metadataJson: string;
+  embeddingDimensions: number;
+  embeddingPreview: string;
+  createdAt?: string;
 };
 
 export type KnowledgeWorkspace = {
@@ -177,6 +197,7 @@ export type SendConversationMessageRequest = {
 export type StreamConversationHandlers = {
   onDelta?: (delta: string) => void;
   onSources?: (sources: ReferenceCard[]) => void;
+  onReasoning?: (reasoning: string) => void;
   onDone?: (payload?: unknown) => void;
 };
 
@@ -282,6 +303,8 @@ export type NavigationItem = {
   path: string;
   section: string;
   icon: string;
+  component: string;
+  redirect: string;
   sortOrder: number;
   status: string;
   visible: boolean;
@@ -297,6 +320,7 @@ export type AdminRoleRecord = {
   description: string;
   status: string;
   sortOrder: number;
+  menuIds: string[];
 };
 
 export type AdminMenuRecord = {
@@ -317,6 +341,18 @@ export type AdminMenuRecord = {
   children: AdminMenuRecord[];
 };
 
+export type AdminUserRecord = {
+  id: string;
+  username: string;
+  roleCode: string;
+  roleName: string;
+  dept: string;
+  status: string;
+  lastLoginAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AdminKnowledgeBaseRecord = {
   id: string;
   code: string;
@@ -332,6 +368,18 @@ export type AdminVendorRecord = {
   code: string;
   name: string;
   endpoint: string;
+  apiKeyMasked: string;
+  description: string;
+  status: string;
+  sortOrder: number;
+};
+
+export type AdminDictionaryRecord = {
+  id: string;
+  dictType: string;
+  dictLabel: string;
+  dictValue: string;
+  description: string;
   status: string;
   sortOrder: number;
 };
@@ -374,11 +422,13 @@ export const apiRoutes = {
   conversations: '/api/v1/conversations',
   admin: {
     navigation: '/api/v1/admin/navigation',
+    users: '/api/v1/admin/users',
     roles: '/api/v1/admin/roles',
     menus: '/api/v1/admin/menus',
     knowledgeBases: '/api/v1/admin/knowledge-bases',
     vendors: '/api/v1/admin/vendors',
-    models: '/api/v1/admin/models'
+    models: '/api/v1/admin/models',
+    dictItems: '/api/v1/admin/dict-items'
   },
   workspaces: {
     dashboard: '/api/v1/workspaces/dashboard',
@@ -436,7 +486,7 @@ async function parseResponseBody(response: Response) {
   const contentType = response.headers.get('Content-Type') ?? '';
 
   if (contentType.includes('application/json')) {
-    return response.json().catch(() => null);
+    return response.text().then(parseJsonWithSafeIds).catch(() => null);
   }
 
   if (contentType.startsWith('text/')) {
@@ -444,6 +494,25 @@ async function parseResponseBody(response: Response) {
   }
 
   return response.text().catch(() => null);
+}
+
+function parseJsonWithSafeIds(text: string) {
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(protectLargeNumericIds(text)) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function protectLargeNumericIds(text: string) {
+  return text.replace(
+    /("(?:(?:[A-Za-z0-9_]*[iI]d)|id)"\s*:\s*)(-?\d{16,})(?=\s*[,}])/g,
+    '$1"$2"'
+  );
 }
 
 function isApiEnvelope<T>(payload: unknown): payload is ApiResponse<T> {
@@ -490,6 +559,10 @@ function documentDetailPath(id: string) {
 
 function documentStatusPath(id: string) {
   return `${apiRoutes.documents}/${id}/status`;
+}
+
+function documentChunksPath(id: string) {
+  return `${apiRoutes.documents}/${id}/chunks`;
 }
 
 function conversationPath(id: string) {
@@ -582,6 +655,10 @@ export function fetchDocumentStatus(id: string) {
   return requestNormalized<KnowledgeDocument>(documentStatusPath(id), normalizeKnowledgeDocument);
 }
 
+export function fetchDocumentChunks(id: string) {
+  return requestNormalized<KnowledgeDocumentChunk[]>(documentChunksPath(id), normalizeKnowledgeDocumentChunkList);
+}
+
 export function deleteDocument(id: string) {
   return request<null>(documentDetailPath(id), {
     method: 'DELETE'
@@ -659,12 +736,16 @@ export async function streamConversationMessage(
     const data = isApiEnvelope(body) ? body.data : body;
     const delta = extractDelta(data);
     const sources = normalizeReferenceList(extractSources(data));
+    const reasoning = extractReasoning(data);
 
     if (delta) {
       handlers.onDelta?.(delta);
     }
     if (sources.length) {
       handlers.onSources?.(sources);
+    }
+    if (reasoning) {
+      handlers.onReasoning?.(reasoning);
     }
 
     handlers.onDone?.(data);
@@ -701,6 +782,14 @@ export async function streamConversationMessage(
         continue;
       }
 
+      if (event.event === 'reasoning' || event.event === 'thinking' || event.event === 'thought') {
+        const reasoning = extractReasoning(event.data);
+        if (reasoning) {
+          handlers.onReasoning?.(reasoning);
+        }
+        continue;
+      }
+
       if (event.event === 'done') {
         handlers.onDone?.(event.data);
         continue;
@@ -719,6 +808,12 @@ export async function streamConversationMessage(
       const delta = extractDelta(event.data);
       if (delta) {
         handlers.onDelta?.(delta);
+        continue;
+      }
+
+      const reasoning = extractReasoning(event.data);
+      if (reasoning) {
+        handlers.onReasoning?.(reasoning);
       }
     }
   }
@@ -729,6 +824,11 @@ export async function streamConversationMessage(
       handlers.onSources?.(normalizeReferenceList(extractSources(event.data)));
     } else if (event?.event === 'done') {
       handlers.onDone?.(event.data);
+    } else if (event?.event === 'reasoning' || event?.event === 'thinking' || event?.event === 'thought') {
+      const reasoning = extractReasoning(event.data);
+      if (reasoning) {
+        handlers.onReasoning?.(reasoning);
+      }
     } else {
       const nextSources = normalizeReferenceList(extractSources(event?.data));
       if (nextSources.length) {
@@ -737,6 +837,11 @@ export async function streamConversationMessage(
         const delta = extractDelta(event?.data);
         if (delta) {
           handlers.onDelta?.(delta);
+        } else {
+          const reasoning = extractReasoning(event?.data);
+          if (reasoning) {
+            handlers.onReasoning?.(reasoning);
+          }
         }
       }
     }
@@ -765,6 +870,30 @@ export function fetchAdminNavigation() {
   return requestNormalized<NavigationItem[]>(apiRoutes.admin.navigation, normalizeNavigationList);
 }
 
+export function fetchAdminUsers() {
+  return requestNormalized<AdminUserRecord[]>(apiRoutes.admin.users, normalizeAdminUserList);
+}
+
+export function createAdminUser(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminUserRecord>(apiRoutes.admin.users, normalizeAdminUser, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminUser(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminUserRecord>(adminResourcePath(apiRoutes.admin.users, id), normalizeAdminUser, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminUser(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.users, id), {
+    method: 'DELETE'
+  });
+}
+
 export function fetchAdminRoles() {
   return requestNormalized<AdminRoleRecord[]>(apiRoutes.admin.roles, normalizeAdminRoleList);
 }
@@ -786,6 +915,15 @@ export function updateAdminRole(id: string, payload: AdminUpsertPayload) {
 export function deleteAdminRole(id: string) {
   return request<null>(adminResourcePath(apiRoutes.admin.roles, id), {
     method: 'DELETE'
+  });
+}
+
+export function replaceAdminRoleMenus(id: string, menuIds: string[]) {
+  return request<null>(`${adminResourcePath(apiRoutes.admin.roles, id)}/menus`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      menuIds
+    })
   });
 }
 
@@ -843,6 +981,30 @@ export function deleteAdminKnowledgeBase(id: string) {
 
 export function fetchAdminVendors() {
   return requestNormalized<AdminVendorRecord[]>(apiRoutes.admin.vendors, normalizeAdminVendorList);
+}
+
+export function fetchAdminDictItems() {
+  return requestNormalized<AdminDictionaryRecord[]>(apiRoutes.admin.dictItems, normalizeAdminDictionaryList);
+}
+
+export function createAdminDictItem(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminDictionaryRecord>(apiRoutes.admin.dictItems, normalizeAdminDictionary, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminDictItem(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminDictionaryRecord>(adminResourcePath(apiRoutes.admin.dictItems, id), normalizeAdminDictionary, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminDictItem(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.dictItems, id), {
+    method: 'DELETE'
+  });
 }
 
 export function createAdminVendor(payload: AdminUpsertPayload) {
@@ -1113,11 +1275,62 @@ function normalizeKnowledgeDocument(value: unknown, index = 0): KnowledgeDocumen
     status: normalizedStatus.value,
     statusLabel: normalizedStatus.label,
     isTerminal: normalizedStatus.isTerminal,
+    errorMessage: pickString(record, ['errorMessage', 'message', 'error'], ''),
     knowledgeBaseId:
       pickString(record, ['knowledgeBaseId', 'kbId']) || pickString(knowledgeBase, ['id', 'knowledgeBaseId'], ''),
     knowledgeBaseName:
-      pickString(record, ['knowledgeBaseName']) || pickString(knowledgeBase, ['name', 'label'], '')
+      pickString(record, ['knowledgeBaseName', 'kbName']) || pickString(knowledgeBase, ['name', 'label'], '')
   };
+}
+
+function normalizeKnowledgeDocumentChunkList(value: unknown): KnowledgeDocumentChunk[] {
+  const record = asRecord(value);
+  const list = Array.isArray(value)
+    ? value
+    : asArray(
+        pickValue(record, ['items', 'list', 'records', 'content', 'chunks', 'data'])
+      );
+
+  return list.map((item, index) => normalizeKnowledgeDocumentChunk(item, index));
+}
+
+function normalizeKnowledgeDocumentChunk(value: unknown, index = 0): KnowledgeDocumentChunk {
+  const record = asRecord(value);
+  const metadataJson = pickString(record, ['metadataJson', 'metadata'], '');
+  const metadata = parseMetadataJson(metadataJson) ?? {};
+  const headingPath = Array.isArray(metadata.headingPath)
+    ? metadata.headingPath.map((item) => String(item)).filter(Boolean)
+    : [];
+
+  return {
+    id: pickString(record, ['id', 'chunkId'], `chunk-${index + 1}`),
+    documentId: pickString(record, ['documentId', 'docId'], ''),
+    documentName: pickString(record, ['documentName', 'filename', 'name'], ''),
+    knowledgeBaseId: pickString(record, ['knowledgeBaseId', 'kbId'], ''),
+    knowledgeBaseName: pickString(record, ['knowledgeBaseName', 'kbName'], ''),
+    content: pickString(record, ['content', 'text'], ''),
+    chunkIndex: pickNumber(record, ['chunkIndex', 'index'], index),
+    tokenCount: pickNumber(record, ['tokenCount', 'tokens'], 0),
+    chunkType: pickString(record, ['chunkType'], String(metadata.chunkType ?? 'text')),
+    pageNo: pickNullableNumber(record, ['pageNo']) ?? pickNullableNumber(metadata, ['pageNo']),
+    headingPath,
+    metadataJson,
+    embeddingDimensions: pickNumber(record, ['embeddingDimensions', 'dimensions'], 0),
+    embeddingPreview: pickString(record, ['embeddingPreview'], ''),
+    createdAt: formatDateLabel(pickValue(record, ['createdAt', 'created_at']))
+  };
+}
+
+function parseMetadataJson(value: string) {
+  if (!value) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return asRecord(parsed) ?? {};
+  } catch {
+    return {};
+  }
 }
 
 function normalizeDocumentStatus(value: string) {
@@ -1180,6 +1393,8 @@ function normalizeNavigationItem(value: unknown, index = 0): NavigationItem {
     path: pickString(record, ['path', 'route', 'url'], ''),
     section,
     icon: pickString(record, ['icon', 'iconName'], ''),
+    component: pickString(record, ['component'], ''),
+    redirect: pickString(record, ['redirect'], ''),
     sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order', 'weight'], index),
     status: pickString(record, ['status', 'state'], 'ACTIVE'),
     visible: pickBoolean(record, ['visible', 'enabled', 'show'], true),
@@ -1213,7 +1428,27 @@ function normalizeAdminRole(value: unknown, index = 0): AdminRoleRecord {
     name: pickString(record, ['name', 'roleName', 'label', 'title'], code),
     description: pickString(record, ['description', 'desc', 'remark'], ''),
     status: pickString(record, ['status', 'state'], 'ACTIVE'),
-    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index),
+    menuIds: pickStringArray(record, ['menuIds', 'menu_ids'], [])
+  };
+}
+
+function normalizeAdminUserList(value: unknown): AdminUserRecord[] {
+  return normalizeAdminList(value, normalizeAdminUser);
+}
+
+function normalizeAdminUser(value: unknown, index = 0): AdminUserRecord {
+  const record = asRecord(value);
+  return {
+    id: pickString(record, ['id', 'userId'], `user-${index + 1}`),
+    username: pickString(record, ['username', 'name', 'nickname'], `用户${index + 1}`),
+    roleCode: pickString(record, ['roleCode', 'role'], ''),
+    roleName: pickString(record, ['roleName', 'roleLabel', 'role_name']) || pickString(record, ['roleCode', 'role'], ''),
+    dept: pickString(record, ['dept', 'department'], ''),
+    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    lastLoginAt: formatDateLabel(pickValue(record, ['lastLoginAt', 'last_login_at'])),
+    createdAt: formatDateLabel(pickValue(record, ['createdAt', 'created_at'])),
+    updatedAt: formatDateLabel(pickValue(record, ['updatedAt', 'updated_at']))
   };
 }
 
@@ -1268,15 +1503,37 @@ function normalizeAdminVendorList(value: unknown): AdminVendorRecord[] {
   return normalizeAdminList(value, normalizeAdminVendor);
 }
 
+function normalizeAdminDictionaryList(value: unknown): AdminDictionaryRecord[] {
+  return normalizeAdminList(value, normalizeAdminDictionary);
+}
+
+function normalizeAdminDictionary(value: unknown, index = 0): AdminDictionaryRecord {
+  const record = asRecord(value);
+  const enabled = pickBoolean(record, ['enabled', 'statusEnabled'], true);
+  const dictValue = pickString(record, ['dictValue', 'value', 'code'], `DICT_${index + 1}`);
+  return {
+    id: pickString(record, ['id', 'dictId'], dictValue),
+    dictType: pickString(record, ['dictType', 'type'], 'COMMON_STATUS'),
+    dictLabel: pickString(record, ['dictLabel', 'label', 'name'], dictValue),
+    dictValue,
+    description: pickString(record, ['description', 'desc', 'remark'], ''),
+    status: pickString(record, ['status', 'state'], enabled ? 'ACTIVE' : 'DISABLED'),
+    sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
+  };
+}
+
 function normalizeAdminVendor(value: unknown, index = 0): AdminVendorRecord {
   const record = asRecord(value);
   const code = pickString(record, ['code', 'vendorCode', 'key'], `vendor-${index + 1}`);
+  const enabled = pickBoolean(record, ['enabled', 'statusEnabled'], true);
   return {
     id: pickString(record, ['id', 'vendorId'], code),
     code,
     name: pickString(record, ['name', 'vendorName', 'label'], code),
     endpoint: pickString(record, ['endpoint', 'baseUrl', 'baseURL', 'url'], ''),
-    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    apiKeyMasked: pickString(record, ['apiKeyMasked', 'maskedApiKey'], ''),
+    description: pickString(record, ['description', 'desc', 'remark'], ''),
+    status: pickString(record, ['status', 'state'], enabled ? 'ACTIVE' : 'DISABLED'),
     sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
   };
 }
@@ -1288,6 +1545,7 @@ function normalizeAdminModelList(value: unknown): AdminModelRecord[] {
 function normalizeAdminModel(value: unknown, index = 0): AdminModelRecord {
   const record = asRecord(value);
   const vendor = asRecord(pickValue(record, ['vendor', 'provider']));
+  const enabled = pickBoolean(record, ['enabled', 'statusEnabled'], true);
   const code = pickString(record, ['code', 'modelCode', 'model', 'key'], `model-${index + 1}`);
   return {
     id: pickString(record, ['id', 'modelId'], code),
@@ -1295,9 +1553,9 @@ function normalizeAdminModel(value: unknown, index = 0): AdminModelRecord {
     name: pickString(record, ['name', 'modelName', 'label'], code),
     vendorId: pickString(record, ['vendorId', 'providerId']) || pickString(vendor, ['id', 'vendorId'], ''),
     vendorName: pickString(record, ['vendorName', 'providerName']) || pickString(vendor, ['name', 'vendorName'], ''),
-    modelType: pickString(record, ['modelType', 'type', 'category'], 'chat'),
+    modelType: pickString(record, ['modelType', 'type', 'category'], 'CHAT'),
     contextWindow: pickNumber(record, ['contextWindow', 'contextLength', 'maxContext'], 0),
-    status: pickString(record, ['status', 'state'], 'ACTIVE'),
+    status: pickString(record, ['status', 'state'], enabled ? 'ACTIVE' : 'DISABLED'),
     sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
   };
 }
@@ -1365,7 +1623,8 @@ function normalizeConversationMessage(value: unknown, index = 0): ConversationMe
           return pickString(reference, ['title', 'name', 'label'], '');
         })
         .filter(Boolean) || undefined,
-    sources: sources.length ? sources : undefined
+    sources: sources.length ? sources : undefined,
+    reasoning: extractReasoning(value) || undefined
   };
 }
 
@@ -1459,6 +1718,19 @@ function extractDelta(value: unknown) {
 function extractSources(value: unknown) {
   const record = asRecord(value);
   return pickValue(record, ['sources', 'references', 'sourceList', 'referenceList', 'data']) ?? value;
+}
+
+function extractReasoning(value: unknown) {
+  if (typeof value === 'string') {
+    return '';
+  }
+
+  const record = asRecord(value);
+  return pickString(
+    record,
+    ['reasoning', 'thinking', 'thought', 'analysis', 'reasoningContent', 'thinkingContent'],
+    ''
+  );
 }
 
 function extractErrorMessage(value: unknown) {

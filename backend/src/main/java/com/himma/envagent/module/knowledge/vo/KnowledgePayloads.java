@@ -18,8 +18,8 @@ public final class KnowledgePayloads {
     }
 
     public record DocumentItem(
-            Long id,
-            Long kbId,
+            String id,
+            String kbId,
             String kbName,
             String filename,
             String name,
@@ -34,7 +34,7 @@ public final class KnowledgePayloads {
     }
 
     public record DocumentStatusItem(
-            Long id,
+            String id,
             String status,
             int chunkCount,
             String errorMessage,
@@ -43,15 +43,31 @@ public final class KnowledgePayloads {
     }
 
     public record UploadDocumentResponse(
-            Long id,
+            String id,
             String status,
             int chunkCount
     ) {
     }
 
+    public record DocumentChunkItem(
+            String id,
+            String documentId,
+            String documentName,
+            String knowledgeBaseId,
+            String knowledgeBaseName,
+            String content,
+            int chunkIndex,
+            int tokenCount,
+            String metadataJson,
+            int embeddingDimensions,
+            String embeddingPreview,
+            LocalDateTime createdAt
+    ) {
+    }
+
     public record SourceItem(
-            Long documentId,
-            Long chunkId,
+            String documentId,
+            String chunkId,
             String documentName,
             String knowledgeBaseName,
             String excerpt,

@@ -2,6 +2,8 @@ package com.himma.envagent.module.admin.controller;
 
 import com.himma.envagent.common.api.ApiResponse;
 import com.himma.envagent.module.admin.service.AdminManagementService;
+import com.himma.envagent.module.admin.vo.AdminPayloads.DictItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.DictRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuItem;
@@ -12,6 +14,8 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleMenusRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.UserItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.UserRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorRequest;
 import jakarta.validation.Valid;
@@ -62,6 +66,50 @@ public class AdminManagementController {
     public ApiResponse<Void> replaceRoleMenus(Authentication authentication, @PathVariable Long id,
                                               @Valid @RequestBody RoleMenusRequest request) {
         adminManagementService.replaceRoleMenus(authentication, id, request.menuIds());
+        return ApiResponse.success(null);
+    }
+
+    @GetMapping("/users")
+    public ApiResponse<List<UserItem>> users(Authentication authentication) {
+        return ApiResponse.success(adminManagementService.listUsers(authentication));
+    }
+
+    @GetMapping("/dict-items")
+    public ApiResponse<List<DictItem>> dictItems(Authentication authentication) {
+        return ApiResponse.success(adminManagementService.listDictItems(authentication));
+    }
+
+    @PostMapping("/dict-items")
+    public ApiResponse<DictItem> createDictItem(Authentication authentication, @Valid @RequestBody DictRequest request) {
+        return ApiResponse.success(adminManagementService.createDictItem(authentication, request));
+    }
+
+    @PutMapping("/dict-items/{id}")
+    public ApiResponse<DictItem> updateDictItem(Authentication authentication, @PathVariable Long id,
+                                                @Valid @RequestBody DictRequest request) {
+        return ApiResponse.success(adminManagementService.updateDictItem(authentication, id, request));
+    }
+
+    @DeleteMapping("/dict-items/{id}")
+    public ApiResponse<Void> deleteDictItem(Authentication authentication, @PathVariable Long id) {
+        adminManagementService.deleteDictItem(authentication, id);
+        return ApiResponse.success(null);
+    }
+
+    @PostMapping("/users")
+    public ApiResponse<UserItem> createUser(Authentication authentication, @Valid @RequestBody UserRequest request) {
+        return ApiResponse.success(adminManagementService.createUser(authentication, request));
+    }
+
+    @PutMapping("/users/{id}")
+    public ApiResponse<UserItem> updateUser(Authentication authentication, @PathVariable Long id,
+                                            @Valid @RequestBody UserRequest request) {
+        return ApiResponse.success(adminManagementService.updateUser(authentication, id, request));
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ApiResponse<Void> deleteUser(Authentication authentication, @PathVariable Long id) {
+        adminManagementService.deleteUser(authentication, id);
         return ApiResponse.success(null);
     }
 

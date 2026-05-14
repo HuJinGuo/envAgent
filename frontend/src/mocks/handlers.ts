@@ -1,14 +1,17 @@
 import { delay, http, HttpResponse } from 'msw';
 import type {
+  AdminDictionaryRecord,
   AdminKnowledgeBaseRecord,
   AdminMenuRecord,
   AdminModelRecord,
   AdminRoleRecord,
+  AdminUserRecord,
   AdminVendorRecord,
   AgentWorkspace,
   ApiResponse,
   ChatWorkspace,
   DashboardSnapshot,
+  KnowledgeDocumentChunk,
   KnowledgeWorkspace,
   LoginResponse,
   MonitorWorkspace,
@@ -128,7 +131,7 @@ let knowledgeBases: MockKnowledgeBase[] = [
 
 let documents: MockDocument[] = [
   {
-    id: 'd1',
+    id: '761245880001000001',
     name: 'GB 8978-1996 污水综合排放标准.pdf',
     knowledgeBaseId: 'kb-law',
     knowledgeBaseName: '法规标准库',
@@ -139,7 +142,7 @@ let documents: MockDocument[] = [
     status: 'READY'
   },
   {
-    id: 'd2',
+    id: '761245880001000002',
     name: '鑫达化工 2026-05 在线监测日报.xlsx',
     knowledgeBaseId: 'kb-monitor',
     knowledgeBaseName: '监测日报库',
@@ -150,7 +153,7 @@ let documents: MockDocument[] = [
     status: 'PROCESSING'
   },
   {
-    id: 'd3',
+    id: '761245880001000003',
     name: '排污许可证到期提醒名单.docx',
     knowledgeBaseId: 'kb-permit',
     knowledgeBaseName: '排污许可证库',
@@ -412,20 +415,32 @@ const usersWorkspace: UsersWorkspace = {
 };
 
 let adminRoles: AdminRoleRecord[] = [
-  { id: 'role-admin', code: 'ADMIN', name: '系统管理员', description: '拥有全部配置与运维权限', status: 'ACTIVE', sortOrder: 10 },
-  { id: 'role-analyst', code: 'ANALYST', name: '监测分析员', description: '可使用问答、知识库和 Agent', status: 'ACTIVE', sortOrder: 20 },
-  { id: 'role-inspector', code: 'INSPECTOR', name: '执法人员', description: '可访问问答与污染源档案', status: 'ACTIVE', sortOrder: 30 }
+  { id: 'role-admin', code: 'ADMIN', name: '系统管理员', description: '拥有全部配置与运维权限', status: 'ACTIVE', sortOrder: 10, menuIds: ['menu-dash', 'menu-chat', 'menu-source', 'menu-kb', 'menu-agent', 'menu-monitor', 'menu-admin', 'menu-users', 'menu-admin-roles', 'menu-admin-menus', 'menu-admin-kbs', 'menu-admin-vendors', 'menu-admin-models', 'menu-admin-dictionaries'] },
+  { id: 'role-analyst', code: 'ANALYST', name: '监测分析员', description: '可使用问答、知识库和 Agent', status: 'ACTIVE', sortOrder: 20, menuIds: ['menu-dash', 'menu-chat', 'menu-source', 'menu-kb', 'menu-agent'] },
+  { id: 'role-inspector', code: 'INSPECTOR', name: '执法人员', description: '可访问问答与污染源档案', status: 'ACTIVE', sortOrder: 30, menuIds: ['menu-dash', 'menu-chat', 'menu-source'] }
+];
+
+let adminUsers: AdminUserRecord[] = [
+  { id: 'user-admin', username: 'admin', roleCode: 'ADMIN', roleName: '系统管理员', dept: '信息中心', status: 'ACTIVE', lastLoginAt: '2026-05-13 09:12', createdAt: '2026-05-01 09:00', updatedAt: '2026-05-13 09:12' },
+  { id: 'user-analyst', username: 'analyst', roleCode: 'ANALYST', roleName: '监测分析员', dept: '监测中心', status: 'ACTIVE', lastLoginAt: '2026-05-13 14:30', createdAt: '2026-05-01 09:00', updatedAt: '2026-05-13 14:30' },
+  { id: 'user-inspector', username: 'inspector', roleCode: 'INSPECTOR', roleName: '执法人员', dept: '执法科', status: 'ACTIVE', lastLoginAt: '2026-05-13 11:45', createdAt: '2026-05-01 09:00', updatedAt: '2026-05-13 11:45' }
 ];
 
 let adminMenus: AdminMenuRecord[] = [
-  { id: 'menu-dash', code: 'dash', name: '仪表盘', title: '仪表盘', path: '/', section: 'dash', icon: 'Gauge', parentId: '', sortOrder: 10, status: 'ACTIVE', visible: true, roles: ['INSPECTOR', 'ANALYST', 'ADMIN'], component: 'DashView', redirect: '', children: [] },
+  { id: 'menu-dash', code: 'dash', name: '仪表盘', title: '仪表盘', path: '/dashboard', section: 'dash', icon: 'Gauge', parentId: '', sortOrder: 10, status: 'ACTIVE', visible: true, roles: ['INSPECTOR', 'ANALYST', 'ADMIN'], component: 'DashboardView', redirect: '', children: [] },
   { id: 'menu-chat', code: 'chat', name: '智能问答', title: '智能问答', path: '/chat', section: 'chat', icon: 'MessageSquareText', parentId: '', sortOrder: 20, status: 'ACTIVE', visible: true, roles: ['INSPECTOR', 'ANALYST', 'ADMIN'], component: 'ChatView', redirect: '', children: [] },
-  { id: 'menu-kb', code: 'kb', name: '知识库', title: '知识库', path: '/knowledge', section: 'kb', icon: 'Database', parentId: '', sortOrder: 30, status: 'ACTIVE', visible: true, roles: ['ANALYST', 'ADMIN'], component: 'KnowledgeView', redirect: '', children: [] },
-  { id: 'menu-source', code: 'source', name: '污染源档案', title: '污染源档案', path: '/source', section: 'source', icon: 'Building2', parentId: '', sortOrder: 40, status: 'ACTIVE', visible: true, roles: ['INSPECTOR', 'ANALYST', 'ADMIN'], component: 'SourceView', redirect: '', children: [] },
+  { id: 'menu-source', code: 'source', name: '污染源档案', title: '污染源档案', path: '/source', section: 'source', icon: 'Building2', parentId: '', sortOrder: 30, status: 'ACTIVE', visible: true, roles: ['INSPECTOR', 'ANALYST', 'ADMIN'], component: 'SourceView', redirect: '', children: [] },
+  { id: 'menu-kb', code: 'kb', name: '知识库', title: '知识库', path: '/knowledge', section: 'kb', icon: 'Database', parentId: '', sortOrder: 40, status: 'ACTIVE', visible: true, roles: ['ANALYST', 'ADMIN'], component: 'KnowledgeView', redirect: '', children: [] },
   { id: 'menu-agent', code: 'agent', name: 'Agent 任务', title: 'Agent 任务', path: '/agent', section: 'agent', icon: 'Bot', parentId: '', sortOrder: 50, status: 'ACTIVE', visible: true, roles: ['ANALYST', 'ADMIN'], component: 'AgentView', redirect: '', children: [] },
   { id: 'menu-monitor', code: 'monitor', name: '系统监控', title: '系统监控', path: '/monitor', section: 'monitor', icon: 'BarChart3', parentId: '', sortOrder: 60, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'MonitorView', redirect: '', children: [] },
-  { id: 'menu-users', code: 'users', name: '用户管理', title: '用户管理', path: '/users', section: 'users', icon: 'Users', parentId: '', sortOrder: 70, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'UsersView', redirect: '', children: [] },
-  { id: 'menu-admin', code: 'admin', name: '基础管理', title: '基础管理', path: '/admin', section: 'admin', icon: 'Settings', parentId: '', sortOrder: 80, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] }
+  { id: 'menu-admin', code: 'admin', name: '基础管理', title: '基础管理', path: '/admin', section: 'admin', icon: 'Settings', parentId: '', sortOrder: 70, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: '', redirect: '/admin/users', children: [] },
+  { id: 'menu-users', code: 'users', name: '用户管理', title: '用户管理', path: '/admin/users', section: 'users', icon: 'Users', parentId: 'menu-admin', sortOrder: 10, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'UsersView', redirect: '', children: [] },
+  { id: 'menu-admin-roles', code: 'roles', name: '角色管理', title: '角色管理', path: '/admin/roles', section: 'admin', icon: 'ShieldCheck', parentId: 'menu-admin', sortOrder: 20, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] },
+  { id: 'menu-admin-menus', code: 'menus', name: '菜单管理', title: '菜单管理', path: '/admin/menus', section: 'admin', icon: 'Layers', parentId: 'menu-admin', sortOrder: 30, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] },
+  { id: 'menu-admin-kbs', code: 'knowledge-bases', name: '知识库管理', title: '知识库管理', path: '/admin/knowledge-bases', section: 'admin', icon: 'Database', parentId: 'menu-admin', sortOrder: 40, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] },
+  { id: 'menu-admin-vendors', code: 'vendors', name: '厂商管理', title: '厂商管理', path: '/admin/vendors', section: 'admin', icon: 'Settings', parentId: 'menu-admin', sortOrder: 50, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] },
+  { id: 'menu-admin-models', code: 'models', name: '模型管理', title: '模型管理', path: '/admin/models', section: 'admin', icon: 'Settings2', parentId: 'menu-admin', sortOrder: 60, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] },
+  { id: 'menu-admin-dictionaries', code: 'dictionaries', name: '业务字典', title: '业务字典', path: '/admin/dictionaries', section: 'admin', icon: 'BookText', parentId: 'menu-admin', sortOrder: 70, status: 'ACTIVE', visible: true, roles: ['ADMIN'], component: 'AdminView', redirect: '', children: [] }
 ];
 
 let adminKnowledgeBases: AdminKnowledgeBaseRecord[] = knowledgeBases.map((item, index) => ({
@@ -439,13 +454,40 @@ let adminKnowledgeBases: AdminKnowledgeBaseRecord[] = knowledgeBases.map((item, 
 }));
 
 let adminVendors: AdminVendorRecord[] = [
-  { id: 'vendor-openai', code: 'openai', name: 'OpenAI', endpoint: 'https://api.openai.com/v1', status: 'ACTIVE', sortOrder: 10 },
-  { id: 'vendor-local', code: 'local', name: '本地兼容服务', endpoint: 'http://127.0.0.1:11434/v1', status: 'ACTIVE', sortOrder: 20 }
+  {
+    id: 'vendor-openai',
+    code: 'openai',
+    name: 'OpenAI',
+    endpoint: 'https://api.openai.com/v1',
+    apiKeyMasked: 'sk-****demo',
+    description: '云端通用模型接入',
+    status: 'ACTIVE',
+    sortOrder: 10
+  },
+  {
+    id: 'vendor-local',
+    code: 'local',
+    name: '本地兼容服务',
+    endpoint: 'http://127.0.0.1:11434/v1',
+    apiKeyMasked: '',
+    description: '本地兼容 OpenAI 协议的推理服务',
+    status: 'ACTIVE',
+    sortOrder: 20
+  }
+];
+
+const vendorSecrets = new Map<string, string>([['vendor-openai', 'sk-live-demo']]);
+
+let adminDictItems: AdminDictionaryRecord[] = [
+  { id: 'dict-status-active', dictType: 'COMMON_STATUS', dictLabel: '启用', dictValue: 'ACTIVE', description: '通用启用状态', status: 'ACTIVE', sortOrder: 10 },
+  { id: 'dict-status-disabled', dictType: 'COMMON_STATUS', dictLabel: '停用', dictValue: 'DISABLED', description: '通用停用状态', status: 'ACTIVE', sortOrder: 20 },
+  { id: 'dict-model-chat', dictType: 'MODEL_TYPE', dictLabel: '对话模型', dictValue: 'CHAT', description: '聊天问答与推理模型', status: 'ACTIVE', sortOrder: 10 },
+  { id: 'dict-model-embedding', dictType: 'MODEL_TYPE', dictLabel: '向量模型', dictValue: 'EMBEDDING', description: '文本向量化与召回模型', status: 'ACTIVE', sortOrder: 20 }
 ];
 
 let adminModels: AdminModelRecord[] = [
-  { id: 'model-chat', code: 'gpt-4o-mini', name: 'GPT-4o Mini', vendorId: 'vendor-openai', vendorName: 'OpenAI', modelType: 'chat', contextWindow: 128000, status: 'ACTIVE', sortOrder: 10 },
-  { id: 'model-embedding', code: 'text-embedding-3-small', name: 'Text Embedding 3 Small', vendorId: 'vendor-openai', vendorName: 'OpenAI', modelType: 'embedding', contextWindow: 8191, status: 'ACTIVE', sortOrder: 20 }
+  { id: 'model-chat', code: 'gpt-4o-mini', name: 'GPT-4o Mini', vendorId: 'vendor-openai', vendorName: 'OpenAI', modelType: 'CHAT', contextWindow: 128000, status: 'ACTIVE', sortOrder: 10 },
+  { id: 'model-embedding', code: 'text-embedding-3-small', name: 'Text Embedding 3 Small', vendorId: 'vendor-openai', vendorName: 'OpenAI', modelType: 'EMBEDDING', contextWindow: 8191, status: 'ACTIVE', sortOrder: 20 }
 ];
 
 function success<T>(data: T) {
@@ -547,6 +589,51 @@ function buildKnowledgeWorkspace(): KnowledgeWorkspace {
   };
 }
 
+function buildMockDocumentChunks(document: MockDocument): KnowledgeDocumentChunk[] {
+  const chunkTotal = Math.max(document.chunkCount || 0, document.status === 'READY' ? 6 : 0);
+  return Array.from({ length: chunkTotal }).map((_, index) => {
+    const chunkIndex = index + 1;
+    const chunkType = document.name.endsWith('.xlsx') && chunkIndex % 3 === 0 ? 'table' : 'text';
+    const headingPath =
+      document.knowledgeBaseId === 'kb-law'
+        ? ['第二章 排放限值', '4.2 水污染物浓度控制']
+        : document.knowledgeBaseId === 'kb-monitor'
+          ? ['监测日报', 'COD 日报记录']
+          : ['许可证附件', '到期提醒'];
+    return {
+      id: `${BigInt(document.id) + BigInt(chunkIndex)}`,
+      documentId: document.id,
+      documentName: document.name,
+      knowledgeBaseId: document.knowledgeBaseId,
+      knowledgeBaseName: document.knowledgeBaseName,
+      content:
+        chunkType === 'table'
+          ? `企业名称 | 日期 | 指标 | 数值\n--- | --- | --- | ---\n鑫达化工 | 2026-05-${String((chunkIndex % 9) + 1).padStart(2, '0')} | COD | ${120 + chunkIndex} mg/L`
+          : `${document.name} 第 ${chunkIndex} 段内容预览。该切片用于展示文档在入库后被拆分、向量化以及后续检索命中的基础信息。`,
+      chunkIndex,
+      tokenCount: 180 + chunkIndex * 7,
+      chunkType,
+      pageNo: (chunkIndex % 8) + 1,
+      headingPath,
+      metadataJson: JSON.stringify({
+        chunkType,
+        headingPath,
+        pageNo: (chunkIndex % 8) + 1
+      }),
+      embeddingDimensions: document.status === 'READY' ? 1536 : 0,
+      embeddingPreview: document.status === 'READY' ? '[0.0182, -0.0921, 0.4470, 0.1035, -0.2204, 0.0088, 0.1523, -0.0419, ...]' : '',
+      createdAt: new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(document.updatedAt))
+    };
+  });
+}
+
+function syncMenuRolesFromRoleBindings() {
+  adminMenus = adminMenus.map((menu) => ({
+    ...menu,
+    roles: adminRoles.filter((role) => role.menuIds.includes(menu.id)).map((role) => role.code)
+  }));
+}
+
 function formatBytes(bytes: number) {
   if (bytes >= 1024 * 1024) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -576,6 +663,21 @@ function createAdminItem<T extends { id: string; code: string; name: string; sta
     status: String(payload.status ?? defaults.status),
     sortOrder: Number(payload.sortOrder ?? defaults.sortOrder)
   } as T;
+}
+
+function maskVendorApiKey(apiKey: string) {
+  const normalized = apiKey.trim();
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.length <= 8) {
+    return `${normalized[0]}***${normalized[normalized.length - 1]}`;
+  }
+  return `${normalized.slice(0, 3)}****${normalized.slice(-4)}`;
+}
+
+function resolveVendorName(vendorId: string) {
+  return adminVendors.find((item) => item.id === vendorId)?.name ?? '';
 }
 
 function menuTree(items: AdminMenuRecord[]): AdminMenuRecord[] {
@@ -673,6 +775,53 @@ export const handlers = [
     await delay(180);
     return success(menuTree(adminMenus));
   }),
+  http.get(apiRoutes.admin.users, async () => {
+    await delay(160);
+    return success([...adminUsers]);
+  }),
+  http.post(apiRoutes.admin.users, async ({ request }) => {
+    await delay(180);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminUserRecord> & { password?: string };
+    const roleCode = String(payload.roleCode ?? 'INSPECTOR');
+    const role = adminRoles.find((item) => item.code === roleCode);
+    const item: AdminUserRecord = {
+      id: nextId('user'),
+      username: String(payload.username ?? 'new-user'),
+      roleCode,
+      roleName: role?.name ?? roleCode,
+      dept: String(payload.dept ?? ''),
+      status: String(payload.status ?? 'ACTIVE'),
+      lastLoginAt: '--',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    adminUsers = [item, ...adminUsers];
+    return success(item);
+  }),
+  http.put(`${apiRoutes.admin.users}/:id`, async ({ params, request }) => {
+    await delay(160);
+    const id = String(params.id);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminUserRecord> & { password?: string };
+    const roleCode = String(payload.roleCode ?? '');
+    const role = adminRoles.find((item) => item.code === roleCode);
+    adminUsers = adminUsers.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...payload,
+            roleCode: roleCode || item.roleCode,
+            roleName: role?.name ?? item.roleName,
+            updatedAt: new Date().toISOString()
+          }
+        : item
+    );
+    return success(adminUsers.find((item) => item.id === id) ?? null);
+  }),
+  http.delete(`${apiRoutes.admin.users}/:id`, async ({ params }) => {
+    await delay(140);
+    adminUsers = adminUsers.filter((item) => item.id !== String(params.id));
+    return success(null);
+  }),
   http.get(apiRoutes.admin.roles, async () => {
     await delay(160);
     return success([...adminRoles].sort((a, b) => a.sortOrder - b.sortOrder));
@@ -686,7 +835,8 @@ export const handlers = [
       name: '新角色',
       description: '',
       status: 'ACTIVE',
-      sortOrder: adminRoles.length * 10 + 10
+      sortOrder: adminRoles.length * 10 + 10,
+      menuIds: []
     });
     adminRoles = [item, ...adminRoles];
     return success(item);
@@ -701,6 +851,22 @@ export const handlers = [
   http.delete(`${apiRoutes.admin.roles}/:id`, async ({ params }) => {
     await delay(140);
     adminRoles = adminRoles.filter((item) => item.id !== String(params.id));
+    syncMenuRolesFromRoleBindings();
+    return success(null);
+  }),
+  http.put(`${apiRoutes.admin.roles}/:id/menus`, async ({ params, request }) => {
+    await delay(180);
+    const id = String(params.id);
+    const payload = (await request.json().catch(() => ({}))) as { menuIds?: Array<string | number> };
+    adminRoles = adminRoles.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            menuIds: (payload.menuIds ?? []).map((menuId) => String(menuId))
+          }
+        : item
+    );
+    syncMenuRolesFromRoleBindings();
     return success(null);
   }),
   http.get(apiRoutes.admin.menus, async () => {
@@ -710,12 +876,14 @@ export const handlers = [
   http.post(apiRoutes.admin.menus, async ({ request }) => {
     await delay(180);
     const payload = (await request.json().catch(() => ({}))) as Partial<AdminMenuRecord>;
+    const component = String(payload.component ?? `${String(payload.code ?? 'dash')}View`);
+    const sectionFromComponent = component.replace(/View$/i, '').toLowerCase();
     const item = createAdminItem('menu', payload, {
       id: '',
       code: 'menu-new',
       name: '新菜单',
       path: '',
-      section: String(payload.section ?? payload.code ?? 'dash'),
+      section: String(payload.section ?? sectionFromComponent ?? payload.code ?? 'dash'),
       icon: '',
       parentId: '',
       sortOrder: adminMenus.length * 10 + 10,
@@ -723,11 +891,12 @@ export const handlers = [
       visible: true,
       roles: [],
       title: String(payload.name ?? '新菜单'),
-      component: `${String(payload.section ?? payload.code ?? 'dash')}View`,
+      component,
       redirect: '',
       children: []
     });
     adminMenus = [item, ...adminMenus];
+    syncMenuRolesFromRoleBindings();
     return success(item);
   }),
   http.put(`${apiRoutes.admin.menus}/:id`, async ({ params, request }) => {
@@ -735,11 +904,17 @@ export const handlers = [
     const id = String(params.id);
     const payload = (await request.json().catch(() => ({}))) as Partial<AdminMenuRecord>;
     adminMenus = upsertById(adminMenus, id, payload);
+    syncMenuRolesFromRoleBindings();
     return success(adminMenus.find((item) => item.id === id) ?? null);
   }),
   http.delete(`${apiRoutes.admin.menus}/:id`, async ({ params }) => {
     await delay(140);
     adminMenus = adminMenus.filter((item) => item.id !== String(params.id));
+    adminRoles = adminRoles.map((role) => ({
+      ...role,
+      menuIds: role.menuIds.filter((menuId) => menuId !== String(params.id))
+    }));
+    syncMenuRolesFromRoleBindings();
     return success(null);
   }),
   http.get(apiRoutes.admin.knowledgeBases, async () => {
@@ -773,34 +948,114 @@ export const handlers = [
     adminKnowledgeBases = adminKnowledgeBases.filter((item) => item.id !== String(params.id));
     return success(null);
   }),
+  http.get(apiRoutes.admin.dictItems, async () => {
+    await delay(160);
+    return success([...adminDictItems].sort((a, b) => a.dictType.localeCompare(b.dictType) || a.sortOrder - b.sortOrder));
+  }),
+  http.post(apiRoutes.admin.dictItems, async ({ request }) => {
+    await delay(180);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminDictionaryRecord> & { enabled?: boolean };
+    const item = {
+      id: nextId('dict'),
+      dictType: String(payload.dictType ?? 'COMMON_STATUS'),
+      dictLabel: String(payload.dictLabel ?? '新字典'),
+      dictValue: String(payload.dictValue ?? `DICT_${adminDictItems.length + 1}`),
+      description: String(payload.description ?? ''),
+      status: payload.enabled === false ? 'DISABLED' : String(payload.status ?? 'ACTIVE'),
+      sortOrder: Number(payload.sortOrder ?? adminDictItems.length * 10 + 10)
+    } satisfies AdminDictionaryRecord;
+    adminDictItems = [item, ...adminDictItems];
+    return success(item);
+  }),
+  http.put(`${apiRoutes.admin.dictItems}/:id`, async ({ params, request }) => {
+    await delay(160);
+    const id = String(params.id);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminDictionaryRecord> & { enabled?: boolean };
+    adminDictItems = adminDictItems.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...payload,
+            dictType: String(payload.dictType ?? item.dictType),
+            dictLabel: String(payload.dictLabel ?? item.dictLabel),
+            dictValue: String(payload.dictValue ?? item.dictValue),
+            description: String(payload.description ?? item.description ?? ''),
+            status: payload.enabled === undefined ? String(payload.status ?? item.status) : payload.enabled ? 'ACTIVE' : 'DISABLED',
+            sortOrder: Number(payload.sortOrder ?? item.sortOrder)
+          }
+        : item
+    );
+    return success(adminDictItems.find((item) => item.id === id) ?? null);
+  }),
+  http.delete(`${apiRoutes.admin.dictItems}/:id`, async ({ params }) => {
+    await delay(140);
+    adminDictItems = adminDictItems.filter((item) => item.id !== String(params.id));
+    return success(null);
+  }),
   http.get(apiRoutes.admin.vendors, async () => {
     await delay(160);
     return success([...adminVendors].sort((a, b) => a.sortOrder - b.sortOrder));
   }),
   http.post(apiRoutes.admin.vendors, async ({ request }) => {
     await delay(180);
-    const payload = (await request.json().catch(() => ({}))) as Partial<AdminVendorRecord>;
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminVendorRecord> & {
+      baseUrl?: string;
+      apiKey?: string;
+      enabled?: boolean;
+    };
     const item = createAdminItem('vendor', payload, {
       id: '',
       code: 'vendor-new',
       name: '新厂商',
-      endpoint: '',
-      status: 'ACTIVE',
+      endpoint: String(payload.endpoint ?? payload.baseUrl ?? ''),
+      apiKeyMasked: '',
+      description: String(payload.description ?? ''),
+      status: payload.enabled === false ? 'DISABLED' : 'ACTIVE',
       sortOrder: adminVendors.length * 10 + 10
     });
+    item.endpoint = String(payload.endpoint ?? payload.baseUrl ?? item.endpoint);
+    item.description = String(payload.description ?? item.description ?? '');
+    item.status = payload.enabled === false ? 'DISABLED' : String(payload.status ?? item.status);
+    if (payload.apiKey && payload.apiKey.trim()) {
+      vendorSecrets.set(item.id, payload.apiKey.trim());
+      item.apiKeyMasked = maskVendorApiKey(payload.apiKey.trim());
+    }
     adminVendors = [item, ...adminVendors];
     return success(item);
   }),
   http.put(`${apiRoutes.admin.vendors}/:id`, async ({ params, request }) => {
     await delay(160);
     const id = String(params.id);
-    const payload = (await request.json().catch(() => ({}))) as Partial<AdminVendorRecord>;
-    adminVendors = upsertById(adminVendors, id, payload);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminVendorRecord> & {
+      baseUrl?: string;
+      apiKey?: string;
+      enabled?: boolean;
+    };
+    adminVendors = adminVendors.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...payload,
+            endpoint: String(payload.endpoint ?? payload.baseUrl ?? item.endpoint),
+            description: String(payload.description ?? item.description ?? ''),
+            status: payload.enabled === undefined ? String(payload.status ?? item.status) : payload.enabled ? 'ACTIVE' : 'DISABLED',
+            apiKeyMasked:
+              payload.apiKey && payload.apiKey.trim()
+                ? maskVendorApiKey(payload.apiKey.trim())
+                : item.apiKeyMasked
+          }
+        : item
+    );
+    if (payload.apiKey && payload.apiKey.trim()) {
+      vendorSecrets.set(id, payload.apiKey.trim());
+    }
     return success(adminVendors.find((item) => item.id === id) ?? null);
   }),
   http.delete(`${apiRoutes.admin.vendors}/:id`, async ({ params }) => {
     await delay(140);
-    adminVendors = adminVendors.filter((item) => item.id !== String(params.id));
+    const id = String(params.id);
+    adminVendors = adminVendors.filter((item) => item.id !== id);
+    vendorSecrets.delete(id);
     return success(null);
   }),
   http.get(apiRoutes.admin.models, async () => {
@@ -809,26 +1064,44 @@ export const handlers = [
   }),
   http.post(apiRoutes.admin.models, async ({ request }) => {
     await delay(180);
-    const payload = (await request.json().catch(() => ({}))) as Partial<AdminModelRecord>;
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminModelRecord> & { enabled?: boolean };
     const item = createAdminItem('model', payload, {
       id: '',
       code: 'model-new',
       name: '新模型',
       vendorId: '',
       vendorName: '',
-      modelType: 'chat',
+      modelType: 'CHAT',
       contextWindow: 0,
       status: 'ACTIVE',
       sortOrder: adminModels.length * 10 + 10
     });
+    item.vendorId = String(payload.vendorId ?? item.vendorId);
+    item.vendorName = resolveVendorName(item.vendorId);
+    item.modelType = String(payload.modelType ?? item.modelType);
+    item.contextWindow = Number(payload.contextWindow ?? item.contextWindow);
+    item.status = payload.enabled === false ? 'DISABLED' : String(payload.status ?? item.status);
     adminModels = [item, ...adminModels];
     return success(item);
   }),
   http.put(`${apiRoutes.admin.models}/:id`, async ({ params, request }) => {
     await delay(160);
     const id = String(params.id);
-    const payload = (await request.json().catch(() => ({}))) as Partial<AdminModelRecord>;
-    adminModels = upsertById(adminModels, id, payload);
+    const payload = (await request.json().catch(() => ({}))) as Partial<AdminModelRecord> & { enabled?: boolean };
+    adminModels = adminModels.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            ...payload,
+            vendorId: String(payload.vendorId ?? item.vendorId),
+            vendorName: resolveVendorName(String(payload.vendorId ?? item.vendorId)),
+            modelType: String(payload.modelType ?? item.modelType),
+            contextWindow: Number(payload.contextWindow ?? item.contextWindow),
+            status: payload.enabled === undefined ? String(payload.status ?? item.status) : payload.enabled ? 'ACTIVE' : 'DISABLED',
+            sortOrder: Number(payload.sortOrder ?? item.sortOrder)
+          }
+        : item
+    );
     return success(adminModels.find((item) => item.id === id) ?? null);
   }),
   http.delete(`${apiRoutes.admin.models}/:id`, async ({ params }) => {
@@ -926,6 +1199,14 @@ export const handlers = [
     }
 
     return success(document);
+  }),
+  http.get(`${apiRoutes.documents}/:id/chunks`, async ({ params }) => {
+    await delay(180);
+    const document = documents.find((item) => item.id === params.id);
+    if (!document) {
+      return HttpResponse.json({ code: 40400, msg: '文档不存在', data: null }, { status: 404 });
+    }
+    return success(buildMockDocumentChunks(document));
   }),
   http.get(apiRoutes.conversations, async () => {
     await delay(160);

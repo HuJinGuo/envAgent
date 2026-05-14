@@ -2,6 +2,7 @@ package com.himma.envagent.module.knowledge.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.himma.envagent.common.support.SnowflakeIdGenerator;
 import com.himma.envagent.module.knowledge.domain.DocumentChunkRecord;
 import com.himma.envagent.module.knowledge.entity.DocumentChunkEntity;
 import com.himma.envagent.module.knowledge.mapper.DocumentChunkMapper;
@@ -18,10 +19,14 @@ import org.springframework.stereotype.Repository;
 public class DocumentChunkRepository {
 
     private final DocumentChunkMapper documentChunkMapper;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final boolean postgres;
 
-    public DocumentChunkRepository(DocumentChunkMapper documentChunkMapper, DataSource dataSource) throws SQLException {
+    public DocumentChunkRepository(DocumentChunkMapper documentChunkMapper,
+                                   DataSource dataSource,
+                                   SnowflakeIdGenerator snowflakeIdGenerator) throws SQLException {
         this.documentChunkMapper = documentChunkMapper;
+        this.snowflakeIdGenerator = snowflakeIdGenerator;
         try (java.sql.Connection connection = dataSource.getConnection()) {
             this.postgres = connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("postgres");
         }
@@ -40,6 +45,7 @@ public class DocumentChunkRepository {
         }
         for (ChunkPayload chunk : chunks) {
             DocumentChunkEntity entity = new DocumentChunkEntity();
+            entity.setId(snowflakeIdGenerator.nextId());
             entity.setDocId(documentId);
             entity.setContent(chunk.content());
             entity.setChunkIndex(chunk.chunkIndex());
@@ -79,6 +85,12 @@ public class DocumentChunkRepository {
                 .toList();
     }
 
+    public List<DocumentChunkRecord> findByDocumentId(long documentId) {
+        return documentChunkMapper.selectByDocumentId(documentId).stream()
+                .map(this::toRecord)
+                .toList();
+    }
+
     private DocumentChunkRecord toRecord(DocumentChunkRow row) {
         return new DocumentChunkRecord(
                 row.getId(),
@@ -90,6 +102,8 @@ public class DocumentChunkRepository {
                 row.getChunkIndex() == null ? 0 : row.getChunkIndex(),
                 row.getTokenCount() == null ? 0 : row.getTokenCount(),
                 row.getEmbedding(),
+                row.getMetadata(),
+                row.getCreatedAt(),
                 row.getScore() == null ? 0D : row.getScore()
         );
     }

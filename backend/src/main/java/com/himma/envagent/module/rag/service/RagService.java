@@ -14,54 +14,48 @@ import org.springframework.stereotype.Service;
 @Service
 public class RagService {
 
-    public record RagAnswer(String answer, List<SourceItem> sources, int inputTokens, int outputTokens) {
+    /**
+     * RAG 阶段的产物：
+     * - turns: 给模型真正喂进去的消息
+     * - sources: 前端引用来源卡片
+     * - fallbackAnswer: 模型不可用时的降级回答
+     *
+     * 这样模型生成能力就不会继续塞在 RagService 里，
+     * RagService 只负责“检索 + 组织上下文”。
+     */
+    public record RagContext(
+            String question,
+            List<ChatTurn> turns,
+            List<SourceItem> sources,
+            String fallbackAnswer
+    ) {
     }
 
     private final DocumentChunkRepository documentChunkRepository;
-    private final ModelGateway modelGateway;
     private final VectorProperties vectorProperties;
 
     public RagService(
             DocumentChunkRepository documentChunkRepository,
-            ModelGateway modelGateway,
             VectorProperties vectorProperties
     ) {
         this.documentChunkRepository = documentChunkRepository;
-        this.modelGateway = modelGateway;
         this.vectorProperties = vectorProperties;
     }
 
-    public RagAnswer answer(String question, Collection<Long> kbIds, List<ChatTurn> history) {
-        // 先把问题向量化，再去知识库里召回最相关的片段。
-        float[] queryEmbedding = modelGateway.embed(List.of(question)).get(0);
+    public RagContext prepareContext(String question, float[] queryEmbedding, Collection<Long> kbIds, List<ChatTurn> history) {
+        // RAG 阶段只做知识检索、sources 提取、prompt 组装，不直接调用模型。
         List<DocumentChunkRecord> rankedChunks = retrieve(queryEmbedding, kbIds, 4);
         List<SourceItem> sources = rankedChunks.stream()
                 .map(chunk -> new SourceItem(
-                        chunk.documentId(),
-                        chunk.id(),
+                        String.valueOf(chunk.documentId()),
+                        String.valueOf(chunk.id()),
                         chunk.documentName(),
                         chunk.knowledgeBaseName(),
                         excerpt(chunk.content(), question),
                         chunk.score()
                 ))
                 .toList();
-
-        String answer;
-        int inputTokens;
-        int outputTokens;
-        try {
-            // 主路径：把“问题 + 检索到的上下文 + 历史对话”交给大模型生成答案。
-            ModelGateway.ChatResult result = modelGateway.chatResult(buildTurns(question, rankedChunks, history));
-            answer = result.answer();
-            inputTokens = safeTokenCount(result.inputTokens(), question);
-            outputTokens = safeTokenCount(result.outputTokens(), answer);
-        } catch (Exception exception) {
-            // 降级路径：模型不可用时，至少返回检索摘要，保证 SSE 链路还能有结果。
-            answer = fallbackAnswer(question, rankedChunks);
-            inputTokens = estimateTokens(question);
-            outputTokens = estimateTokens(answer);
-        }
-        return new RagAnswer(answer, sources, inputTokens, outputTokens);
+        return new RagContext(question, buildTurns(question, rankedChunks, history), sources, fallbackAnswer(question, rankedChunks));
     }
 
     public String formatEmbedding(float[] embedding) {
@@ -108,6 +102,8 @@ public class RagService {
                     candidate.chunkIndex(),
                     candidate.tokenCount(),
                     candidate.embedding(),
+                    candidate.metadataJson(),
+                    candidate.createdAt(),
                     score
             ));
         }
@@ -138,11 +134,11 @@ public class RagService {
         // system 负责约束回答风格，user 负责携带当前检索上下文和问题本身。
         turns.add(new ChatTurn(
                 "system",
-                "你是环保领域知识库问答助手。只基于提供的上下文回答，回答要简洁、结构化；如果上下文不足，要明确说明。"
+                "你是环保领域知识库问答助手。基于提供的上下文回答，回答要简洁、结构化；如果上下文不足，要明确说明。"
         ));
         if (history != null && !history.isEmpty()) {
-            // 这里只保留最近几轮历史，避免 prompt 无限增长。
-            turns.addAll(history.stream().limit(Math.max(0, history.size() - 6)).toList());
+            // ConversationService 进入这里之前已经裁好了最近几轮历史，这里直接拼接即可。
+            turns.addAll(history);
         }
         turns.add(new ChatTurn(
                 "user",
@@ -181,20 +177,6 @@ public class RagService {
         int start = Math.max(0, index - 40);
         int end = Math.min(normalized.length(), start + 160);
         return normalized.substring(start, end) + (end < normalized.length() ? "..." : "");
-    }
-
-    private int estimateTokens(String text) {
-        if (text == null || text.isBlank()) {
-            return 0;
-        }
-        return Math.max(1, text.length() / 4);
-    }
-
-    private int safeTokenCount(Integer tokenCount, String fallbackText) {
-        if (tokenCount != null && tokenCount > 0) {
-            return tokenCount;
-        }
-        return estimateTokens(fallbackText);
     }
 
     private float[] parseEmbedding(String value) {

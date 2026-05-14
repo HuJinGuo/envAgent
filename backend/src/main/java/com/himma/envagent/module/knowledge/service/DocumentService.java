@@ -1,10 +1,12 @@
 package com.himma.envagent.module.knowledge.service;
 
 import com.himma.envagent.common.exception.BusinessException;
+import com.himma.envagent.module.knowledge.domain.DocumentChunkRecord;
 import com.himma.envagent.module.knowledge.domain.DocumentRecord;
 import com.himma.envagent.module.knowledge.repository.DocumentChunkRepository;
 import com.himma.envagent.module.knowledge.repository.DocumentRepository;
 import com.himma.envagent.module.knowledge.repository.KnowledgeBaseRepository;
+import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentChunkItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentStatusItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.UploadDocumentResponse;
@@ -43,8 +45,11 @@ public class DocumentService {
         this.storageBasePath = Path.of(storageBasePath).toAbsolutePath().normalize();
     }
 
-    public List<DocumentItem> list() {
-        return documentRepository.findAll().stream().map(this::toItem).toList();
+    public List<DocumentItem> list(Long knowledgeBaseId) {
+        return documentRepository.findAll().stream()
+                .filter(record -> knowledgeBaseId == null || knowledgeBaseId.equals(record.kbId()))
+                .map(this::toItem)
+                .toList();
     }
 
     public DocumentItem get(long documentId) {
@@ -56,12 +61,20 @@ public class DocumentService {
         DocumentRecord record = documentRepository.findById(documentId)
                 .orElseThrow(() -> new BusinessException(404, "文档不存在"));
         return new DocumentStatusItem(
-                record.id(),
+                String.valueOf(record.id()),
                 record.status().name(),
                 record.chunkCount(),
                 record.errorMessage(),
                 record.updatedAt()
         );
+    }
+
+    public List<DocumentChunkItem> listChunks(long documentId) {
+        documentRepository.findById(documentId)
+                .orElseThrow(() -> new BusinessException(404, "文档不存在"));
+        return documentChunkRepository.findByDocumentId(documentId).stream()
+                .map(this::toChunkItem)
+                .toList();
     }
 
     public UploadDocumentResponse upload(MultipartFile file, Long kbId, Long userId) {
@@ -84,7 +97,7 @@ public class DocumentService {
                     userId
             );
             documentIngestionService.ingest(documentId);
-            return new UploadDocumentResponse(documentId, "PENDING", 0);
+            return new UploadDocumentResponse(String.valueOf(documentId), "PENDING", 0);
         } catch (IOException exception) {
             throw new IllegalStateException("failed to save file", exception);
         }
@@ -128,8 +141,8 @@ public class DocumentService {
 
     private DocumentItem toItem(DocumentRecord record) {
         return new DocumentItem(
-                record.id(),
-                record.kbId(),
+                String.valueOf(record.id()),
+                record.kbId() == null ? null : String.valueOf(record.kbId()),
                 record.kbName(),
                 record.filename(),
                 record.filename(),
@@ -141,6 +154,61 @@ public class DocumentService {
                 record.createdAt(),
                 record.updatedAt()
         );
+    }
+
+    private DocumentChunkItem toChunkItem(DocumentChunkRecord record) {
+        return new DocumentChunkItem(
+                String.valueOf(record.id()),
+                String.valueOf(record.documentId()),
+                record.documentName(),
+                record.knowledgeBaseId() == null ? null : String.valueOf(record.knowledgeBaseId()),
+                record.knowledgeBaseName(),
+                record.content(),
+                record.chunkIndex(),
+                record.tokenCount(),
+                record.metadataJson(),
+                countEmbeddingDimensions(record.embedding()),
+                buildEmbeddingPreview(record.embedding()),
+                record.createdAt()
+        );
+    }
+
+    private int countEmbeddingDimensions(String embedding) {
+        if (embedding == null || embedding.isBlank()) {
+            return 0;
+        }
+        String normalized = embedding.trim();
+        if (normalized.startsWith("[") && normalized.endsWith("]")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+        if (normalized.isBlank()) {
+            return 0;
+        }
+        return (int) java.util.Arrays.stream(normalized.split(","))
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .count();
+    }
+
+    private String buildEmbeddingPreview(String embedding) {
+        if (embedding == null || embedding.isBlank()) {
+            return "";
+        }
+        String normalized = embedding.trim();
+        if (normalized.startsWith("[") && normalized.endsWith("]")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+        String[] parts = normalized.split(",");
+        if (parts.length == 0) {
+            return "";
+        }
+        return java.util.Arrays.stream(parts)
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .limit(8)
+                .reduce((left, right) -> left + ", " + right)
+                .map(value -> "[" + value + (parts.length > 8 ? ", ...]" : "]"))
+                .orElse("");
     }
 
     private String extension(String filename) {

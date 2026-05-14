@@ -4,20 +4,22 @@ import { cn } from '../lib/utils';
 
 export function TopStat(props: { label: string; value: string; note: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.18em] text-white/38">{props.label}</p>
-      <div className="mt-2 text-lg font-semibold text-white">{props.value}</div>
-      <p className="mt-1 text-xs text-white/45">{props.note}</p>
+    <div className="rounded border border-[#e2e8f0] bg-white px-3 py-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#94a3b8]">{props.label}</p>
+      <div className="mt-1 text-base font-semibold text-[#1f2937]">{props.value}</div>
+      <p className="mt-1 truncate text-xs text-[#64748b]">{props.note}</p>
     </div>
   );
 }
 
 export function MetricCard(props: { label: string; value: string; note: string; accent: 'blue' | 'emerald' | 'lime' | 'amber' }) {
   return (
-    <div className="rounded border border-[#dcdfe6] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <div className="text-sm text-[#606266]">{props.label}</div>
-      <div className={cn('mt-3 text-3xl font-semibold', accentClass(props.accent))}>{props.value}</div>
-      <div className="mt-2 text-sm text-[#909399]">{props.note}</div>
+    <div className="rounded border border-[#e2e8f0] bg-white px-4 py-3">
+      <div className="text-xs font-medium uppercase tracking-[0.08em] text-[#94a3b8]">{props.label}</div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div className={cn('text-[28px] font-semibold leading-none', accentClass(props.accent))}>{props.value}</div>
+        <div className="max-w-[60%] text-right text-xs leading-5 text-[#64748b]">{props.note}</div>
+      </div>
     </div>
   );
 }
@@ -27,13 +29,13 @@ export function InfoTile(props: { label: string; value: string; tone?: 'good' | 
     <div
       className={cn(
         'rounded border p-4',
-        props.tone === 'good' && 'border-[#c2e7b0] bg-[#f0f9eb]',
-        props.tone === 'warn' && 'border-[#f3d19e] bg-[#fdf6ec]',
+        props.tone === 'good' && 'border-[#b7e4c7] bg-[#edfdf3]',
+        props.tone === 'warn' && 'border-[#f7d9a4] bg-[#fff9ed]',
         !props.tone && 'border-[#dcdfe6] bg-white'
       )}
     >
-      <div className="text-[11px] uppercase tracking-normal text-[#909399]">{props.label}</div>
-      <div className="mt-3 break-all text-sm leading-6 text-[#303133]">{props.value}</div>
+      <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#94a3b8]">{props.label}</div>
+      <div className="mt-2 break-all text-sm leading-6 text-[#334155]">{props.value}</div>
     </div>
   );
 }
@@ -69,7 +71,7 @@ export function PageSkeleton(props: { blocks: number }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {Array.from({ length: props.blocks }).map((_, index) => (
-        <div key={index} className="h-40 animate-pulse rounded-[28px] border border-white/10 bg-white/[0.03]" />
+        <div key={index} className="h-32 animate-pulse rounded border border-[#e2e8f0] bg-white" />
       ))}
     </div>
   );
@@ -100,18 +102,18 @@ export function statusTone(value: string) {
 
 function accentClass(accent: 'blue' | 'emerald' | 'lime' | 'amber') {
   if (accent === 'blue') {
-    return 'text-[#409eff]';
+    return 'text-[#2563eb]';
   }
 
   if (accent === 'emerald') {
-    return 'text-[#67c23a]';
+    return 'text-[#16a34a]';
   }
 
   if (accent === 'amber') {
-    return 'text-[#e6a23c]';
+    return 'text-[#d97706]';
   }
 
-  return 'text-[#409eff]';
+  return 'text-[#0f766e]';
 }
 
 export function getErrorMessage(error: unknown) {
@@ -125,4 +127,3 @@ export function getErrorMessage(error: unknown) {
 
   return '请求失败，请稍后再试。';
 }
-

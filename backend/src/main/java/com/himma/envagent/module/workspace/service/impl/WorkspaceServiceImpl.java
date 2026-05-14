@@ -142,7 +142,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
 
     @Override
     public KnowledgeWorkspace getKnowledgeWorkspace() {
-        List<DocumentItem> documents = documentService.list();
+        List<DocumentItem> documents = documentService.list(null);
         List<KnowledgeBaseItem> knowledgeBases = knowledgeBaseService.list();
         return new KnowledgeWorkspace(
                 List.of(

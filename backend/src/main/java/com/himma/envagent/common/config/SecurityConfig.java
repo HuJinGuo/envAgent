@@ -3,6 +3,7 @@ package com.himma.envagent.common.config;
 import com.himma.envagent.common.security.RestAccessDeniedHandler;
 import com.himma.envagent.common.security.RestAuthenticationEntryPoint;
 import com.himma.envagent.module.auth.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -40,6 +41,9 @@ public class SecurityConfig {
                         .authenticationEntryPoint(restAuthenticationEntryPoint)
                         .accessDeniedHandler(restAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
+                        // StreamingResponseBody 会走 ASYNC dispatcher；如果这里不放行，
+                        // 首帧已经写出后再次进入过滤链时可能被 AuthorizationFilter 拦截。
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/system/**",
                                 "/api/v1/auth/login",
                                 "/api/health",

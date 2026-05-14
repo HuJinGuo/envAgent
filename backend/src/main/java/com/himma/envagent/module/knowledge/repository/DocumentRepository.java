@@ -3,6 +3,7 @@ package com.himma.envagent.module.knowledge.repository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.himma.envagent.common.support.SnowflakeIdGenerator;
 import com.himma.envagent.module.knowledge.domain.DocumentRecord;
 import com.himma.envagent.module.knowledge.domain.DocumentStatus;
 import com.himma.envagent.module.knowledge.entity.DocumentEntity;
@@ -16,14 +17,17 @@ import org.springframework.stereotype.Repository;
 public class DocumentRepository {
 
     private final DocumentMapper documentMapper;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
 
-    public DocumentRepository(DocumentMapper documentMapper) {
+    public DocumentRepository(DocumentMapper documentMapper, SnowflakeIdGenerator snowflakeIdGenerator) {
         this.documentMapper = documentMapper;
+        this.snowflakeIdGenerator = snowflakeIdGenerator;
     }
 
     public long insert(Long kbId, String filename, String contentType, String storagePath, long fileSize, Long createdBy) {
         // Repository 层负责把领域参数装配成 Entity，再交给 MyBatis-Plus 落库。
         DocumentEntity entity = new DocumentEntity();
+        entity.setId(snowflakeIdGenerator.nextId());
         entity.setKbId(kbId);
         entity.setFilename(filename);
         entity.setContentType(contentType);

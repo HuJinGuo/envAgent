@@ -42,37 +42,39 @@ export function DashboardPage(props: {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="今日 AI 问答"
-          value={String(props.dashboard.todayQuestions)}
-          note={`满意率 ${formatPercent(props.dashboard.satisfactionRate)}`}
-          accent="blue"
-        />
-        <MetricCard
-          label="知识库文档"
-          value={String(props.dashboard.knowledgeDocuments)}
-          note={`本周新增 ${props.dashboard.newDocumentsWeek} 份`}
-          accent="emerald"
-        />
-        <MetricCard
-          label="Agent 任务"
-          value={String(props.dashboard.activeAgentTasks)}
-          note={`${props.dashboard.completedAgentTasks} 已完成 · ${props.dashboard.activeAgentTasks - props.dashboard.completedAgentTasks} 进行中`}
-          accent="lime"
-        />
-        <MetricCard
-          label="今日 Token 费用"
-          value={`¥${props.dashboard.todayTokenCost}`}
-          note={`本月累计 ¥${props.dashboard.monthTokenCost}`}
-          accent="amber"
-        />
-      </div>
+      <Panel title="运行概览" description="保留核心指标，但收成后台工作台常见的四列概览带，减少独立卡片数量。">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="今日 AI 问答"
+            value={String(props.dashboard.todayQuestions)}
+            note={`满意率 ${formatPercent(props.dashboard.satisfactionRate)}`}
+            accent="blue"
+          />
+          <MetricCard
+            label="知识库文档"
+            value={String(props.dashboard.knowledgeDocuments)}
+            note={`本周新增 ${props.dashboard.newDocumentsWeek} 份`}
+            accent="emerald"
+          />
+          <MetricCard
+            label="Agent 任务"
+            value={String(props.dashboard.activeAgentTasks)}
+            note={`${props.dashboard.completedAgentTasks} 已完成 · ${props.dashboard.activeAgentTasks - props.dashboard.completedAgentTasks} 进行中`}
+            accent="lime"
+          />
+          <MetricCard
+            label="今日 Token 费用"
+            value={`¥${props.dashboard.todayTokenCost}`}
+            note={`本月累计 ¥${props.dashboard.monthTokenCost}`}
+            accent="amber"
+          />
+        </div>
+      </Panel>
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Panel
           title="最近问答记录"
-          description="围绕执法与监测的高频提问组织，后续可直接接会话列表接口。"
+          description="保留最近问答列表作为首页主视区，弱化展示型装饰。"
           action={
             <Button variant="ghost" size="sm" onClick={props.onRefresh}>
               <RefreshCw className="h-4 w-4" />
@@ -80,7 +82,7 @@ export function DashboardPage(props: {
             </Button>
           }
         >
-          <div className="overflow-hidden rounded-[24px] border border-white/10">
+          <div className="workspace-table">
             <table className="w-full text-left text-sm">
               <thead className="bg-white/[0.04] text-white/50">
                 <tr>
@@ -102,7 +104,7 @@ export function DashboardPage(props: {
           </div>
         </Panel>
 
-        <Panel title="知识库使用分布" description="文档里的知识库使用比例页签被压缩为趋势条，更适合首页扫描。">
+        <Panel title="知识库使用分布" description="以条形占比展示热点知识域，保持后台页的一眼可读。">
           <div className="space-y-4">
             {props.dashboard.knowledgeUsage.map((item) => (
               <BarRow key={item.label} label={item.label} value={item.percent} color={item.color} />
@@ -112,10 +114,10 @@ export function DashboardPage(props: {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel title="当前交付物" description="对应设计文档里一期、二期的必做内容，把状态压到首页。">
-          <div className="space-y-3">
+        <Panel title="当前交付物" description="交付状态收成清单行，不再拆很多独立小卡片。">
+          <div className="space-y-2">
             {props.dashboard.taskStatus.map((item) => (
-              <div key={item.id} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div key={item.id} className="rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white">{item.label}</p>
@@ -128,7 +130,7 @@ export function DashboardPage(props: {
           </div>
         </Panel>
 
-        <Panel title="系统健康摘录" description="展示当前服务、模型与检索阈值等运行状态。">
+        <Panel title="系统健康摘录" description="接口状态与模型配置直接压缩为信息块。">
           {props.healthLoading ? (
             <PageSkeleton blocks={3} />
           ) : props.healthError ? (
@@ -148,4 +150,3 @@ export function DashboardPage(props: {
     </>
   );
 }
-

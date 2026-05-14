@@ -7,7 +7,6 @@ import java.util.Collection;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -15,17 +14,15 @@ import org.apache.ibatis.annotations.Select;
 public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
 
     @Insert("""
-            INSERT INTO document_chunks (doc_id, content, chunk_index, token_count, embedding, metadata, created_at)
-            VALUES (#{docId}, #{content}, #{chunkIndex}, #{tokenCount}, CAST(#{embedding} AS vector), CAST(#{metadata} AS jsonb), CURRENT_TIMESTAMP)
+            INSERT INTO document_chunks (id, doc_id, content, chunk_index, token_count, embedding, metadata, created_at)
+            VALUES (#{id}, #{docId}, #{content}, #{chunkIndex}, #{tokenCount}, CAST(#{embedding} AS vector), CAST(#{metadata} AS jsonb), CURRENT_TIMESTAMP)
             """)
-    @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertPostgres(DocumentChunkEntity entity);
 
     @Insert("""
-            INSERT INTO document_chunks (doc_id, content, chunk_index, token_count, embedding, metadata, created_at)
-            VALUES (#{docId}, #{content}, #{chunkIndex}, #{tokenCount}, #{embedding}, #{metadata}, CURRENT_TIMESTAMP)
+            INSERT INTO document_chunks (id, doc_id, content, chunk_index, token_count, embedding, metadata, created_at)
+            VALUES (#{id}, #{docId}, #{content}, #{chunkIndex}, #{tokenCount}, #{embedding}, #{metadata}, CURRENT_TIMESTAMP)
             """)
-    @Options(useGeneratedKeys = true, keyProperty = "id")
     int insertDefault(DocumentChunkEntity entity);
 
     @Select({
@@ -39,6 +36,8 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
             "       dc.chunk_index,",
             "       dc.token_count,",
             "       dc.embedding,",
+            "       dc.metadata,",
+            "       dc.created_at,",
             "       1 - (dc.embedding &lt;=&gt; CAST(#{queryEmbedding} AS vector)) AS score",
             "FROM document_chunks dc",
             "JOIN documents d ON d.id = dc.doc_id",
@@ -71,6 +70,8 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
             "       dc.chunk_index,",
             "       dc.token_count,",
             "       dc.embedding,",
+            "       dc.metadata,",
+            "       dc.created_at,",
             "       0 AS score",
             "FROM document_chunks dc",
             "JOIN documents d ON d.id = dc.doc_id",
@@ -86,4 +87,25 @@ public interface DocumentChunkMapper extends BaseMapper<DocumentChunkEntity> {
             "</script>"
     })
     List<DocumentChunkRow> selectReadyChunks(@Param("kbIds") Collection<Long> kbIds);
+
+    @Select("""
+            SELECT dc.id,
+                   dc.doc_id,
+                   d.filename AS document_name,
+                   d.kb_id,
+                   kb.name AS kb_name,
+                   dc.content,
+                   dc.chunk_index,
+                   dc.token_count,
+                   dc.embedding,
+                   dc.metadata,
+                   dc.created_at,
+                   0 AS score
+            FROM document_chunks dc
+            JOIN documents d ON d.id = dc.doc_id
+            LEFT JOIN knowledge_bases kb ON kb.id = d.kb_id
+            WHERE dc.doc_id = #{documentId}
+            ORDER BY dc.chunk_index ASC
+            """)
+    List<DocumentChunkRow> selectByDocumentId(@Param("documentId") long documentId);
 }

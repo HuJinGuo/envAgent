@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @TableName("document_chunks")
 public class DocumentChunkEntity {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
 
     @TableField("doc_id")

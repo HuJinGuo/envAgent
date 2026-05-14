@@ -87,14 +87,64 @@ public class ConversationController {
             Authentication authentication
     ) {
         long userId = currentUser(authentication).getId();
-        ConversationReply reply = conversationService.reply(userId, conversationId, request.content());
         StreamingResponseBody body = outputStream -> {
             try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
-                for (String fragment : split(reply.answer(), 28)) {
-                    writeEvent(writer, "delta", new DeltaPayload(fragment));
-                }
-                writeEvent(writer, "sources", reply.sources());
-                writeEvent(writer, "done", new DonePayload(reply.messageId(), reply.inputTokens(), reply.outputTokens()));
+                conversationService.streamReply(userId, conversationId, request.content(), new ConversationService.ReplyStreamListener() {
+                    @Override
+                    public void onThinking(String thinking) {
+                        synchronized (writer) {
+                            try {
+                                writeEvent(writer, "thinking", new ThinkingPayload(thinking));
+                            } catch (java.io.IOException exception) {
+                                throw new IllegalStateException("failed to write thinking event", exception);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onSources(List<com.himma.envagent.module.knowledge.vo.KnowledgePayloads.SourceItem> sources) {
+                        synchronized (writer) {
+                            try {
+                                writeEvent(writer, "sources", sources);
+                            } catch (java.io.IOException exception) {
+                                throw new IllegalStateException("failed to write sources event", exception);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onDelta(String delta) {
+                        synchronized (writer) {
+                            try {
+                                writeEvent(writer, "delta", new DeltaPayload(delta));
+                            } catch (java.io.IOException exception) {
+                                throw new IllegalStateException("failed to write delta event", exception);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onComplete(ConversationReply reply) {
+                        synchronized (writer) {
+                            try {
+                                writeEvent(writer, "done", new DonePayload(reply.messageId(), reply.inputTokens(), reply.outputTokens()));
+                            } catch (java.io.IOException exception) {
+                                throw new IllegalStateException("failed to write done event", exception);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable error) {
+                        synchronized (writer) {
+                            try {
+                                writeEvent(writer, "error", new ErrorPayload(error == null ? "流式问答失败" : error.getMessage()));
+                            } catch (java.io.IOException exception) {
+                                throw new IllegalStateException("failed to write error event", exception);
+                            }
+                        }
+                    }
+                });
             }
         };
         return ResponseEntity.ok()
@@ -103,21 +153,14 @@ public class ConversationController {
     }
 
     private void writeEvent(OutputStreamWriter writer, String event, Object payload) throws java.io.IOException {
+        // 标准 SSE 格式：
+        // event: 事件名
+        // data: JSON 字符串
+        //
+        // 末尾必须有一个空行，前端才会把这一帧当成完整事件消费掉。
         writer.write("event: " + event + "\n");
         writer.write("data: " + objectMapper.writeValueAsString(payload) + "\n\n");
         writer.flush();
-    }
-
-    private List<String> split(String text, int chunkSize) {
-        java.util.ArrayList<String> parts = new java.util.ArrayList<>();
-        if (text == null || text.isBlank()) {
-            parts.add("");
-            return parts;
-        }
-        for (int start = 0; start < text.length(); start += chunkSize) {
-            parts.add(text.substring(start, Math.min(text.length(), start + chunkSize)));
-        }
-        return parts;
     }
 
     private UserEntity currentUser(Authentication authentication) {
@@ -128,6 +171,12 @@ public class ConversationController {
     private record DeltaPayload(String content) {
     }
 
+    private record ThinkingPayload(String thinking) {
+    }
+
     private record DonePayload(Long messageId, int inputTokens, int outputTokens) {
+    }
+
+    private record ErrorPayload(String message) {
     }
 }

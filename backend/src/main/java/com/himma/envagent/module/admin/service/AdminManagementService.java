@@ -5,9 +5,12 @@ import com.himma.envagent.module.admin.domain.AdminRecords.DefaultMenu;
 import com.himma.envagent.module.admin.entity.AdminKnowledgeBaseEntity;
 import com.himma.envagent.module.admin.entity.AiModelEntity;
 import com.himma.envagent.module.admin.entity.ModelVendorEntity;
+import com.himma.envagent.module.admin.entity.SysDictItemEntity;
 import com.himma.envagent.module.admin.entity.SysMenuEntity;
 import com.himma.envagent.module.admin.entity.SysRoleEntity;
 import com.himma.envagent.module.admin.repository.AdminRepository;
+import com.himma.envagent.module.admin.vo.AdminPayloads.DictItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.DictRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuItem;
@@ -17,9 +20,13 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.ModelItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.UserItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.UserRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorRequest;
+import com.himma.envagent.module.auth.domain.UserEntity;
 import com.himma.envagent.module.auth.domain.UserRole;
+import com.himma.envagent.module.auth.domain.UserStatus;
 import com.himma.envagent.module.workspace.service.WorkspaceAccessService;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
@@ -28,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,22 +43,31 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminManagementService {
 
     private static final List<DefaultMenu> DEFAULT_MENUS = List.of(
-            new DefaultMenu("dash", "Dashboard", "监管总览", "/dashboard", "DashboardView", "LayoutDashboard", 10),
-            new DefaultMenu("chat", "Chat", "智能问答", "/chat", "ChatView", "MessageCircle", 20),
-            new DefaultMenu("source", "Source", "污染源", "/source", "SourceView", "Factory", 30),
-            new DefaultMenu("kb", "Knowledge", "知识库", "/knowledge", "KnowledgeView", "Library", 40),
-            new DefaultMenu("agent", "Agent", "Agent", "/agent", "AgentView", "Bot", 50),
-            new DefaultMenu("monitor", "Monitor", "系统监控", "/monitor", "MonitorView", "Activity", 60),
-            new DefaultMenu("users", "Users", "用户管理", "/users", "UsersView", "Users", 70),
-            new DefaultMenu("admin", "Admin", "基础管理", "/admin", "AdminView", "Settings", 80)
+            new DefaultMenu("dash", null, "Dashboard", "监管总览", "/dashboard", "DashboardView", "LayoutDashboard", null, 10),
+            new DefaultMenu("chat", null, "Chat", "智能问答", "/chat", "ChatView", "MessageCircle", null, 20),
+            new DefaultMenu("source", null, "Source", "污染源", "/source", "SourceView", "Factory", null, 30),
+            new DefaultMenu("kb", null, "Knowledge", "知识库", "/knowledge", "KnowledgeView", "Library", null, 40),
+            new DefaultMenu("agent", null, "Agent", "Agent", "/agent", "AgentView", "Bot", null, 50),
+            new DefaultMenu("monitor", null, "Monitor", "系统监控", "/monitor", "MonitorView", "Activity", null, 60),
+            new DefaultMenu("admin", null, "Admin", "基础管理", "/admin", null, "Settings", "/admin/users", 70),
+            new DefaultMenu("users", "admin", "Users", "用户管理", "/admin/users", "UsersView", "Users", null, 10),
+            new DefaultMenu("roles", "admin", "Roles", "角色管理", "/admin/roles", "AdminView", "ShieldCheck", null, 20),
+            new DefaultMenu("menus", "admin", "Menus", "菜单管理", "/admin/menus", "AdminView", "Layers", null, 30),
+            new DefaultMenu("knowledge-bases", "admin", "Knowledge Bases", "知识库管理", "/admin/knowledge-bases", "AdminView", "Database", null, 40),
+            new DefaultMenu("vendors", "admin", "Vendors", "厂商管理", "/admin/vendors", "AdminView", "Settings", null, 50),
+            new DefaultMenu("models", "admin", "Models", "模型管理", "/admin/models", "AdminView", "Settings2", null, 60),
+            new DefaultMenu("dictionaries", "admin", "Dictionaries", "业务字典", "/admin/dictionaries", "AdminView", "BookText", null, 70)
     );
 
     private final AdminRepository adminRepository;
     private final WorkspaceAccessService workspaceAccessService;
+    private final PasswordEncoder passwordEncoder;
 
-    public AdminManagementService(AdminRepository adminRepository, WorkspaceAccessService workspaceAccessService) {
+    public AdminManagementService(AdminRepository adminRepository, WorkspaceAccessService workspaceAccessService,
+                                  PasswordEncoder passwordEncoder) {
         this.adminRepository = adminRepository;
         this.workspaceAccessService = workspaceAccessService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostConstruct
@@ -62,7 +79,12 @@ public class AdminManagementService {
         for (DefaultMenu menu : DEFAULT_MENUS) {
             ensureMenu(menu);
         }
-        ensureRoleMenus("ADMIN", List.of("dash", "chat", "source", "kb", "agent", "monitor", "users", "admin"));
+        ensureRoleMenus("ADMIN", List.of("dash", "chat", "source", "kb", "agent", "monitor", "admin", "users", "roles", "menus",
+                "knowledge-bases", "vendors", "models", "dictionaries"));
+        ensureDictItem("COMMON_STATUS", "启用", "ACTIVE", "通用启用状态", 10);
+        ensureDictItem("COMMON_STATUS", "停用", "DISABLED", "通用停用状态", 20);
+        ensureDictItem("MODEL_TYPE", "对话模型", "CHAT", "面向聊天与推理问答", 10);
+        ensureDictItem("MODEL_TYPE", "向量模型", "EMBEDDING", "面向文本向量化与检索", 20);
         ensureRoleMenus("ANALYST", List.of("dash", "chat", "source", "kb", "agent"));
         ensureRoleMenus("INSPECTOR", List.of("dash", "chat", "source"));
         ensureVendorAndModel();
@@ -122,6 +144,71 @@ public class AdminManagementService {
         adminRepository.replaceRoleMenus(id, menuIds);
     }
 
+    public List<UserItem> listUsers(Authentication authentication) {
+        requireAdmin(authentication);
+        return adminRepository.users().stream().map(this::toUserItem).toList();
+    }
+
+    public List<DictItem> listDictItems(Authentication authentication) {
+        requireAdmin(authentication);
+        return adminRepository.dictItems().stream().map(this::toDictItem).toList();
+    }
+
+    @Transactional
+    public DictItem createDictItem(Authentication authentication, DictRequest request) {
+        requireAdmin(authentication);
+        adminRepository.dictItemByTypeAndValue(request.dictType().trim(), request.dictValue().trim())
+                .ifPresent((item) -> {
+                    throw new BusinessException(409, "同一字典类型下的字典值已存在");
+                });
+        return toDictItem(adminRepository.saveDictItem(applyDictItem(new SysDictItemEntity(), request)));
+    }
+
+    @Transactional
+    public DictItem updateDictItem(Authentication authentication, Long id, DictRequest request) {
+        requireAdmin(authentication);
+        SysDictItemEntity entity = adminRepository.dictItemById(id).orElseThrow(() -> new BusinessException(404, "字典项不存在"));
+        adminRepository.dictItemByTypeAndValue(request.dictType().trim(), request.dictValue().trim())
+                .filter((item) -> !item.getId().equals(id))
+                .ifPresent((item) -> {
+                    throw new BusinessException(409, "同一字典类型下的字典值已存在");
+                });
+        return toDictItem(adminRepository.saveDictItem(applyDictItem(entity, request)));
+    }
+
+    @Transactional
+    public void deleteDictItem(Authentication authentication, Long id) {
+        requireAdmin(authentication);
+        adminRepository.deleteDictItem(id);
+    }
+
+    @Transactional
+    public UserItem createUser(Authentication authentication, UserRequest request) {
+        requireAdmin(authentication);
+        adminRepository.userByUsername(request.username()).ifPresent((user) -> {
+            throw new BusinessException(409, "用户名已存在");
+        });
+        return toUserItem(adminRepository.saveUser(applyUser(new UserEntity(), request, true)));
+    }
+
+    @Transactional
+    public UserItem updateUser(Authentication authentication, Long id, UserRequest request) {
+        requireAdmin(authentication);
+        UserEntity entity = adminRepository.userById(id).orElseThrow(() -> new BusinessException(404, "用户不存在"));
+        adminRepository.userByUsername(request.username())
+                .filter((user) -> !user.getId().equals(id))
+                .ifPresent((user) -> {
+                    throw new BusinessException(409, "用户名已存在");
+                });
+        return toUserItem(adminRepository.saveUser(applyUser(entity, request, false)));
+    }
+
+    @Transactional
+    public void deleteUser(Authentication authentication, Long id) {
+        requireAdmin(authentication);
+        adminRepository.deleteUser(id);
+    }
+
     public List<MenuTreeItem> navigation(Authentication authentication) {
         return buildTree(adminRepository.visibleMenusByRole(currentRole(authentication)));
     }
@@ -140,8 +227,8 @@ public class AdminManagementService {
     @Transactional
     public VendorItem updateVendor(Authentication authentication, Long id, VendorRequest request) {
         requireAdmin(authentication);
-        ModelVendorEntity entity = new ModelVendorEntity();
-        entity.setId(id);
+        ModelVendorEntity entity = adminRepository.vendorById(id)
+                .orElseThrow(() -> new BusinessException(404, "厂商不存在"));
         return toVendorItem(adminRepository.saveVendor(applyVendor(entity, request)));
     }
 
@@ -165,8 +252,8 @@ public class AdminManagementService {
     @Transactional
     public ModelItem updateModel(Authentication authentication, Long id, ModelRequest request) {
         requireAdmin(authentication);
-        AiModelEntity entity = new AiModelEntity();
-        entity.setId(id);
+        AiModelEntity entity = adminRepository.modelById(id)
+                .orElseThrow(() -> new BusinessException(404, "模型不存在"));
         return toModelItem(adminRepository.saveModel(applyModel(entity, request)));
     }
 
@@ -227,18 +314,21 @@ public class AdminManagementService {
     }
 
     private void ensureMenu(DefaultMenu menu) {
-        adminRepository.menuByCode(menu.code()).orElseGet(() -> {
-            SysMenuEntity entity = new SysMenuEntity();
-            entity.setCode(menu.code());
-            entity.setName(menu.name());
-            entity.setTitle(menu.title());
-            entity.setPath(menu.path());
-            entity.setComponent(menu.component());
-            entity.setIcon(menu.icon());
-            entity.setSortOrder(menu.sortOrder());
-            entity.setVisible(true);
-            return adminRepository.saveMenu(entity);
-        });
+        SysMenuEntity entity = adminRepository.menuByCode(menu.code()).orElseGet(SysMenuEntity::new);
+        Long parentId = menu.parentCode() == null
+                ? null
+                : adminRepository.menuByCode(menu.parentCode()).map(SysMenuEntity::getId).orElse(null);
+        entity.setParentId(parentId);
+        entity.setCode(menu.code());
+        entity.setName(menu.name());
+        entity.setTitle(menu.title());
+        entity.setPath(menu.path());
+        entity.setComponent(menu.component());
+        entity.setIcon(menu.icon());
+        entity.setRedirect(menu.redirect());
+        entity.setSortOrder(menu.sortOrder());
+        entity.setVisible(true);
+        adminRepository.saveMenu(entity);
     }
 
     private void ensureRoleMenus(String roleCode, List<String> menuCodes) {
@@ -247,6 +337,18 @@ public class AdminManagementService {
             Long menuId = adminRepository.menuByCode(menuCode).orElseThrow().getId();
             adminRepository.addRoleMenuIfMissing(roleId, menuId);
         }
+    }
+
+    private void ensureDictItem(String dictType, String dictLabel, String dictValue, String description, int sortOrder) {
+        SysDictItemEntity entity = adminRepository.dictItemByTypeAndValue(dictType, dictValue).orElseGet(SysDictItemEntity::new);
+        entity.setDictType(dictType);
+        entity.setDictLabel(dictLabel);
+        entity.setDictValue(dictValue);
+        entity.setDescription(description);
+        entity.setEnabled(true);
+        entity.setSortOrder(sortOrder);
+        entity.setUpdatedAt(LocalDateTime.now());
+        adminRepository.saveDictItem(entity);
     }
 
     private void ensureVendorAndModel() {
@@ -301,11 +403,42 @@ public class AdminManagementService {
         return entity;
     }
 
+    private UserEntity applyUser(UserEntity entity, UserRequest request, boolean createMode) {
+        entity.setUsername(request.username());
+        entity.setRole(request.roleCode());
+        entity.setDept(request.dept());
+        entity.setStatus((request.status() == null || request.status().isBlank()) ? UserStatus.ACTIVE.name() : request.status());
+        if (createMode) {
+            String rawPassword = (request.password() == null || request.password().isBlank()) ? "Env@123456" : request.password();
+            entity.setPasswordHash(passwordEncoder.encode(rawPassword));
+            entity.setCreatedAt(LocalDateTime.now());
+        } else if (request.password() != null && !request.password().isBlank()) {
+            entity.setPasswordHash(passwordEncoder.encode(request.password()));
+        }
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
+    private SysDictItemEntity applyDictItem(SysDictItemEntity entity, DictRequest request) {
+        entity.setDictType(request.dictType().trim());
+        entity.setDictLabel(request.dictLabel().trim());
+        entity.setDictValue(request.dictValue().trim());
+        entity.setDescription(request.description());
+        entity.setEnabled(request.enabled() == null || request.enabled());
+        entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
     private ModelVendorEntity applyVendor(ModelVendorEntity entity, VendorRequest request) {
         entity.setCode(request.code());
         entity.setName(request.name());
         entity.setBaseUrl(request.baseUrl());
-        entity.setApiKeyMasked(request.apiKeyMasked());
+        if (request.apiKey() != null && !request.apiKey().isBlank()) {
+            String normalizedApiKey = request.apiKey().trim();
+            entity.setApiKey(normalizedApiKey);
+            entity.setApiKeyMasked(maskApiKey(normalizedApiKey));
+        }
         entity.setDescription(request.description());
         entity.setEnabled(request.enabled() == null || request.enabled());
         entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
@@ -357,7 +490,16 @@ public class AdminManagementService {
 
     private RoleItem toRoleItem(SysRoleEntity entity) {
         return new RoleItem(entity.getId(), entity.getCode(), entity.getName(), entity.getDescription(),
-                entity.getSortOrder(), entity.getEnabled(), entity.getCreatedAt(), entity.getUpdatedAt());
+                entity.getSortOrder(), entity.getEnabled(), adminRepository.menuIdsByRoleId(entity.getId()),
+                entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    private UserItem toUserItem(UserEntity entity) {
+        String roleName = adminRepository.roleByCode(entity.getRole())
+                .map(SysRoleEntity::getName)
+                .orElse(entity.getRole());
+        return new UserItem(entity.getId(), entity.getUsername(), entity.getRole(), roleName, entity.getDept(),
+                entity.getStatus(), entity.getLastLoginAt(), entity.getCreatedAt(), entity.getUpdatedAt());
     }
 
     private MenuItem toMenuItem(SysMenuEntity entity) {
@@ -372,8 +514,25 @@ public class AdminManagementService {
                 entity.getCreatedAt(), entity.getUpdatedAt());
     }
 
+    private DictItem toDictItem(SysDictItemEntity entity) {
+        return new DictItem(entity.getId(), entity.getDictType(), entity.getDictLabel(), entity.getDictValue(),
+                entity.getDescription(), entity.getEnabled(), entity.getSortOrder(), entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    private String maskApiKey(String apiKey) {
+        String normalized = apiKey == null ? "" : apiKey.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (normalized.length() <= 8) {
+            return normalized.charAt(0) + "***" + normalized.charAt(normalized.length() - 1);
+        }
+        return normalized.substring(0, 3) + "****" + normalized.substring(normalized.length() - 4);
+    }
+
     private ModelItem toModelItem(AiModelEntity entity) {
-        return new ModelItem(entity.getId(), entity.getVendorId(), entity.getCode(), entity.getName(),
+        String vendorName = adminRepository.vendorById(entity.getVendorId()).map(ModelVendorEntity::getName).orElse("");
+        return new ModelItem(entity.getId(), entity.getVendorId(), vendorName, entity.getCode(), entity.getName(),
                 entity.getModelType(), entity.getContextWindow(), entity.getMaxOutputTokens(), entity.getEnabled(),
                 entity.getSortOrder(), entity.getCreatedAt(), entity.getUpdatedAt());
     }

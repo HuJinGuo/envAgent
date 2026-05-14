@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 @TableName("documents")
 public class DocumentEntity {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.INPUT)
     private Long id;
 
     @TableField("kb_id")

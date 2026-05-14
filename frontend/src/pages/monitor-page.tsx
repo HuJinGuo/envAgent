@@ -28,16 +28,16 @@ export function MonitorPage(props: {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="服务可用率" value={data.availability} note="近 30 天" accent="emerald" />
         <MetricCard label="平均响应时长" value={data.averageLatency} note="问答 1.8s · Embedding 0.4s" accent="blue" />
         <MetricCard label="今日 Token 消耗" value={data.todayTokens.toLocaleString()} note="输入 + 输出合计" accent="lime" />
         <MetricCard label="本月累计费用" value={data.monthCost} note="较上月下降 12%" accent="amber" />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <Panel title="7 日 Token 趋势" description="按日汇总模型调用量，便于观察资源消耗波动。">
-          <div className="flex h-44 items-end gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex h-40 items-end gap-3 rounded border border-white/10 bg-white/[0.03] p-4">
             {data.trend.map((value, index) => (
               <div key={index} className="flex flex-1 flex-col items-center gap-2">
                 <div className={cn('w-full rounded-t-xl', index === data.trend.length - 1 ? 'bg-[#d7ff64]' : 'bg-[#4cc3ff]')} style={{ height: `${value}%` }} />
@@ -63,7 +63,7 @@ export function MonitorPage(props: {
       </div>
 
       <Panel title="最近调用记录" description="这一块对应文档里的调用日志和 Token 统计表。">
-        <div className="overflow-hidden rounded-[24px] border border-white/10">
+        <div className="workspace-table">
           <table className="w-full text-left text-sm">
             <thead className="bg-white/[0.04] text-white/50">
               <tr>
@@ -103,4 +103,3 @@ export function MonitorPage(props: {
     </>
   );
 }
-
