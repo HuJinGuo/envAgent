@@ -5,9 +5,7 @@ import com.himma.envagent.module.admin.domain.AdminRecords.DefaultMenu;
 import com.himma.envagent.module.admin.entity.AdminKnowledgeBaseEntity;
 import com.himma.envagent.module.admin.entity.AiModelEntity;
 import com.himma.envagent.module.admin.entity.AgentToolEntity;
-import com.himma.envagent.module.admin.entity.MonitorDataEntity;
 import com.himma.envagent.module.admin.entity.ModelVendorEntity;
-import com.himma.envagent.module.admin.entity.MonitorStationEntity;
 import com.himma.envagent.module.admin.entity.SysDictItemEntity;
 import com.himma.envagent.module.admin.entity.SysMenuEntity;
 import com.himma.envagent.module.admin.entity.SysRoleEntity;
@@ -19,16 +17,10 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuTreeItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRangeRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataSimulateRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.StationItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.StationRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolSearchRequest;
@@ -40,6 +32,8 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.VendorRequest;
 import com.himma.envagent.module.auth.domain.UserEntity;
 import com.himma.envagent.module.auth.domain.UserRole;
 import com.himma.envagent.module.auth.domain.UserStatus;
+import com.himma.envagent.module.business.monitor.service.MonitorSimulationService;
+import com.himma.envagent.module.business.monitor.service.MonitorStationService;
 import com.himma.envagent.module.rag.service.ModelGateway;
 import com.himma.envagent.module.workspace.service.WorkspaceAccessService;
 import jakarta.annotation.PostConstruct;
@@ -50,7 +44,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -81,32 +74,27 @@ public class AdminManagementService {
             new DefaultMenu("monitor-data", "business", "Monitor Data", "监测数据", "/business/monitor-data", "AdminView", "ChartColumnBig", null, 20)
     );
 
-    private static final List<MonitorDataRangeRequest> DEFAULT_MONITOR_PARAMS = List.of(
-            new MonitorDataRangeRequest("TN", "总氮", 1.2, 2.4),
-            new MonitorDataRangeRequest("TP", "总磷", 0.03, 0.18),
-            new MonitorDataRangeRequest("NH3N", "氨氮", 0.08, 0.9),
-            new MonitorDataRangeRequest("PH", "ph", 6.8, 8.2),
-            new MonitorDataRangeRequest("CODMN", "高猛", 2.0, 6.5),
-            new MonitorDataRangeRequest("WL", "水位", 2.5, 4.6),
-            new MonitorDataRangeRequest("VS", "流速", 0.05, 0.8),
-            new MonitorDataRangeRequest("Q", "流量", 15.0, 180.0)
-    );
-
     private final AdminRepository adminRepository;
     private final WorkspaceAccessService workspaceAccessService;
     private final PasswordEncoder passwordEncoder;
     private final ToolEmbeddingService toolEmbeddingService;
     private final ModelGateway modelGateway;
+    private final MonitorStationService monitorStationService;
+    private final MonitorSimulationService monitorSimulationService;
 
     public AdminManagementService(AdminRepository adminRepository, WorkspaceAccessService workspaceAccessService,
                                   PasswordEncoder passwordEncoder,
                                   ToolEmbeddingService toolEmbeddingService,
-                                  ModelGateway modelGateway) {
+                                  ModelGateway modelGateway,
+                                  MonitorStationService monitorStationService,
+                                  MonitorSimulationService monitorSimulationService) {
         this.adminRepository = adminRepository;
         this.workspaceAccessService = workspaceAccessService;
         this.passwordEncoder = passwordEncoder;
         this.toolEmbeddingService = toolEmbeddingService;
         this.modelGateway = modelGateway;
+        this.monitorStationService = monitorStationService;
+        this.monitorSimulationService = monitorSimulationService;
     }
 
     @PostConstruct
@@ -128,8 +116,8 @@ public class AdminManagementService {
         ensureRoleMenus("INSPECTOR", List.of("dash", "chat", "source"));
         ensureVendorAndModel();
         ensureTools();
-        ensureStations();
-        ensureMonitorDataSamples();
+        monitorStationService.ensureDefaultStations();
+        monitorSimulationService.seedSampleDataIfEmpty();
     }
 
     public List<RoleItem> listRoles(Authentication authentication) {
@@ -406,109 +394,6 @@ public class AdminManagementService {
         adminRepository.deleteKnowledgeBase(id);
     }
 
-    public List<StationItem> listStations(Authentication authentication) {
-        requireAdmin(authentication);
-        return adminRepository.stations().stream().map(this::toStationItem).toList();
-    }
-
-    @Transactional
-    public StationItem createStation(Authentication authentication, StationRequest request) {
-        requireAdmin(authentication);
-        validateStationUniqueness(request, null);
-        return toStationItem(adminRepository.saveStation(applyStation(new MonitorStationEntity(), request)));
-    }
-
-    @Transactional
-    public StationItem updateStation(Authentication authentication, Long id, StationRequest request) {
-        requireAdmin(authentication);
-        MonitorStationEntity entity = adminRepository.stationById(id)
-                .orElseThrow(() -> new BusinessException(404, "站点不存在"));
-        validateStationUniqueness(request, id);
-        return toStationItem(adminRepository.saveStation(applyStation(entity, request)));
-    }
-
-    @Transactional
-    public void deleteStation(Authentication authentication, Long id) {
-        requireAdmin(authentication);
-        adminRepository.deleteStation(id);
-    }
-
-    public List<MonitorDataItem> listMonitorData(Authentication authentication) {
-        requireAdmin(authentication);
-        return adminRepository.monitorData().stream().map(this::toMonitorDataItem).toList();
-    }
-
-    @Transactional
-    public MonitorDataItem createMonitorData(Authentication authentication, MonitorDataRequest request) {
-        requireAdmin(authentication);
-        validateMonitorDataRequest(request);
-        return toMonitorDataItem(adminRepository.saveMonitorData(applyMonitorData(new MonitorDataEntity(), request)));
-    }
-
-    @Transactional
-    public MonitorDataItem updateMonitorData(Authentication authentication, Long id, MonitorDataRequest request) {
-        requireAdmin(authentication);
-        MonitorDataEntity entity = adminRepository.monitorDataById(id)
-                .orElseThrow(() -> new BusinessException(404, "监测数据不存在"));
-        validateMonitorDataRequest(request);
-        return toMonitorDataItem(adminRepository.saveMonitorData(applyMonitorData(entity, request)));
-    }
-
-    @Transactional
-    public void deleteMonitorData(Authentication authentication, Long id) {
-        requireAdmin(authentication);
-        adminRepository.deleteMonitorData(id);
-    }
-
-    @Transactional
-    public List<MonitorDataItem> simulateMonitorData(Authentication authentication, MonitorDataSimulateRequest request) {
-        requireAdmin(authentication);
-        if (request.ranges() == null || request.ranges().isEmpty()) {
-            throw new BusinessException(400, "至少需要配置一个监测参数范围");
-        }
-        String targetMn = request.mn().trim();
-        List<MonitorDataRangeRequest> ranges = request.ranges().stream()
-                .sorted(Comparator.comparing(MonitorDataRangeRequest::paramCode))
-                .toList();
-        for (MonitorDataRangeRequest range : ranges) {
-            validateMonitorRange(range);
-        }
-        List<MonitorDataItem> generated = new ArrayList<>();
-        List<String> targetMns;
-        if ("ALL".equalsIgnoreCase(targetMn)) {
-            targetMns = adminRepository.stations().stream()
-                    .map(MonitorStationEntity::getMn)
-                    .sorted()
-                    .toList();
-            if (targetMns.isEmpty()) {
-                throw new BusinessException(400, "当前暂无可用站点，无法模拟全部站点数据");
-            }
-        } else {
-            requireExistingStationMn(targetMn);
-            targetMns = List.of(targetMn);
-        }
-
-        for (String mn : targetMns) {
-            adminRepository.deleteMonitorDataByMnAndTime(mn, request.dataTime());
-            for (MonitorDataRangeRequest range : ranges) {
-                MonitorDataEntity entity = new MonitorDataEntity();
-                entity.setMn(mn);
-                entity.setParamCode(range.paramCode().trim());
-                entity.setParamName(range.paramName().trim());
-                entity.setMeasureValue(randomValue(range.minValue(), range.maxValue()));
-                entity.setDataTime(request.dataTime());
-                entity.setUpdatedAt(LocalDateTime.now());
-                generated.add(toMonitorDataItem(adminRepository.saveMonitorData(entity)));
-            }
-        }
-        return generated;
-    }
-
-    public List<MonitorDataRangeRequest> listMonitorParamTemplates(Authentication authentication) {
-        requireAdmin(authentication);
-        return DEFAULT_MONITOR_PARAMS;
-    }
-
     private void requireAdmin(Authentication authentication) {
         workspaceAccessService.requireRoles(authentication, "基础管理接口", UserRole.ADMIN);
     }
@@ -658,45 +543,6 @@ public class AdminManagementService {
         }
     }
 
-    private void ensureStations() {
-        ensureStation("TH-WX-001", "320200A001", 31.4382, 120.2096, "太湖梅梁湖心", 21);
-        ensureStation("TH-WX-002", "320200A002", 31.3745, 120.1688, "太湖北部湖心", 21);
-        ensureStation("TH-WX-003", "320200A003", 31.2874, 120.2203, "太湖贡湖湾口", 21);
-        ensureStation("TH-WX-004", "320200A004", 31.2258, 120.1107, "太湖拖山近岸", 21);
-    }
-
-    private void ensureMonitorDataSamples() {
-        if (!adminRepository.monitorData().isEmpty()) {
-            return;
-        }
-        LocalDateTime sampleTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
-        for (MonitorStationEntity station : adminRepository.stations()) {
-            adminRepository.deleteMonitorDataByMnAndTime(station.getMn(), sampleTime);
-            for (MonitorDataRangeRequest range : DEFAULT_MONITOR_PARAMS) {
-                MonitorDataEntity entity = new MonitorDataEntity();
-                entity.setMn(station.getMn());
-                entity.setParamCode(range.paramCode());
-                entity.setParamName(range.paramName());
-                entity.setMeasureValue(randomValue(range.minValue(), range.maxValue()));
-                entity.setDataTime(sampleTime);
-                entity.setUpdatedAt(LocalDateTime.now());
-                adminRepository.saveMonitorData(entity);
-            }
-        }
-    }
-
-    private void ensureStation(String stationId, String mn, double lat, double lng, String mnName, int st) {
-        MonitorStationEntity entity = adminRepository.stationByStationId(stationId).orElseGet(MonitorStationEntity::new);
-        entity.setStationId(stationId);
-        entity.setMn(mn);
-        entity.setLat(lat);
-        entity.setLng(lng);
-        entity.setMnName(mnName);
-        entity.setSt(st);
-        entity.setUpdatedAt(LocalDateTime.now());
-        adminRepository.saveStation(entity);
-    }
-
     private SysRoleEntity applyRole(SysRoleEntity entity, RoleRequest request) {
         entity.setCode(request.code());
         entity.setName(request.name());
@@ -803,63 +649,6 @@ public class AdminManagementService {
         return entity;
     }
 
-    private MonitorStationEntity applyStation(MonitorStationEntity entity, StationRequest request) {
-        entity.setStationId(request.stationId().trim());
-        entity.setMn(request.mn().trim());
-        entity.setLat(request.lat());
-        entity.setLng(request.lng());
-        entity.setMnName(request.mnName().trim());
-        entity.setSt(request.st());
-        entity.setUpdatedAt(LocalDateTime.now());
-        return entity;
-    }
-
-    private MonitorDataEntity applyMonitorData(MonitorDataEntity entity, MonitorDataRequest request) {
-        entity.setMn(request.mn().trim());
-        entity.setParamCode(request.paramCode().trim());
-        entity.setParamName(request.paramName().trim());
-        entity.setMeasureValue(request.value());
-        entity.setDataTime(request.dataTime());
-        entity.setUpdatedAt(LocalDateTime.now());
-        return entity;
-    }
-
-    private void validateStationUniqueness(StationRequest request, Long currentId) {
-        adminRepository.stationByStationId(request.stationId().trim())
-                .filter(item -> currentId == null || !item.getId().equals(currentId))
-                .ifPresent(item -> {
-                    throw new BusinessException(409, "站点编码已存在");
-                });
-        adminRepository.stationByMn(request.mn().trim())
-                .filter(item -> currentId == null || !item.getId().equals(currentId))
-                .ifPresent(item -> {
-                    throw new BusinessException(409, "MN 编号已存在");
-                });
-    }
-
-    private void validateMonitorDataRequest(MonitorDataRequest request) {
-        requireExistingStationMn(request.mn().trim());
-        if (request.paramCode().isBlank() || request.paramName().isBlank()) {
-            throw new BusinessException(400, "监测参数不能为空");
-        }
-    }
-
-    private void validateMonitorRange(MonitorDataRangeRequest range) {
-        if (range.minValue() > range.maxValue()) {
-            throw new BusinessException(400, range.paramName() + " 的最小值不能大于最大值");
-        }
-    }
-
-    private void requireExistingStationMn(String mn) {
-        adminRepository.stationByMn(mn)
-                .orElseThrow(() -> new BusinessException(400, "未找到对应站点 MN"));
-    }
-
-    private double randomValue(double minValue, double maxValue) {
-        double value = minValue + (maxValue - minValue) * ThreadLocalRandom.current().nextDouble();
-        return Math.round(value * 1000D) / 1000D;
-    }
-
     private List<MenuTreeItem> buildTree(List<SysMenuEntity> menus) {
         Map<Long, List<SysMenuEntity>> byParent = new LinkedHashMap<>();
         for (SysMenuEntity menu : menus) {
@@ -960,33 +749,6 @@ public class AdminManagementService {
                 roleIds,
                 roles.stream().map(SysRoleEntity::getCode).toList(),
                 roles.stream().map(SysRoleEntity::getName).toList(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
-    }
-
-    private StationItem toStationItem(MonitorStationEntity entity) {
-        return new StationItem(
-                entity.getId(),
-                entity.getStationId(),
-                entity.getMn(),
-                entity.getLat(),
-                entity.getLng(),
-                entity.getMnName(),
-                entity.getSt(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
-    }
-
-    private MonitorDataItem toMonitorDataItem(MonitorDataEntity entity) {
-        return new MonitorDataItem(
-                entity.getId(),
-                entity.getMn(),
-                entity.getParamCode(),
-                entity.getParamName(),
-                entity.getMeasureValue(),
-                entity.getDataTime(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

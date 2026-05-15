@@ -9,17 +9,11 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuTreeItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRangeRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataSimulateRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleMenusRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.StationItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.StationRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRolesRequest;
@@ -253,59 +247,4 @@ public class AdminManagementController {
         return ApiResponse.success(null);
     }
 
-    @GetMapping("/stations")
-    public ApiResponse<List<StationItem>> stations(Authentication authentication) {
-        return ApiResponse.success(adminManagementService.listStations(authentication));
-    }
-
-    @PostMapping("/stations")
-    public ApiResponse<StationItem> createStation(Authentication authentication, @Valid @RequestBody StationRequest request) {
-        return ApiResponse.success(adminManagementService.createStation(authentication, request));
-    }
-
-    @PutMapping("/stations/{id}")
-    public ApiResponse<StationItem> updateStation(Authentication authentication, @PathVariable Long id,
-                                                  @Valid @RequestBody StationRequest request) {
-        return ApiResponse.success(adminManagementService.updateStation(authentication, id, request));
-    }
-
-    @DeleteMapping("/stations/{id}")
-    public ApiResponse<Void> deleteStation(Authentication authentication, @PathVariable Long id) {
-        adminManagementService.deleteStation(authentication, id);
-        return ApiResponse.success(null);
-    }
-
-    @GetMapping("/monitor-data")
-    public ApiResponse<List<MonitorDataItem>> monitorData(Authentication authentication) {
-        return ApiResponse.success(adminManagementService.listMonitorData(authentication));
-    }
-
-    @PostMapping("/monitor-data")
-    public ApiResponse<MonitorDataItem> createMonitorData(Authentication authentication,
-                                                          @Valid @RequestBody MonitorDataRequest request) {
-        return ApiResponse.success(adminManagementService.createMonitorData(authentication, request));
-    }
-
-    @PutMapping("/monitor-data/{id}")
-    public ApiResponse<MonitorDataItem> updateMonitorData(Authentication authentication, @PathVariable Long id,
-                                                          @Valid @RequestBody MonitorDataRequest request) {
-        return ApiResponse.success(adminManagementService.updateMonitorData(authentication, id, request));
-    }
-
-    @DeleteMapping("/monitor-data/{id}")
-    public ApiResponse<Void> deleteMonitorData(Authentication authentication, @PathVariable Long id) {
-        adminManagementService.deleteMonitorData(authentication, id);
-        return ApiResponse.success(null);
-    }
-
-    @GetMapping("/monitor-data/params")
-    public ApiResponse<List<MonitorDataRangeRequest>> monitorDataParams(Authentication authentication) {
-        return ApiResponse.success(adminManagementService.listMonitorParamTemplates(authentication));
-    }
-
-    @PostMapping("/monitor-data/simulate")
-    public ApiResponse<List<MonitorDataItem>> simulateMonitorData(Authentication authentication,
-                                                                  @Valid @RequestBody MonitorDataSimulateRequest request) {
-        return ApiResponse.success(adminManagementService.simulateMonitorData(authentication, request));
-    }
 }

@@ -502,11 +502,13 @@ export const apiRoutes = {
     models: '/api/v1/admin/models',
     dictItems: '/api/v1/admin/dict-items',
     tools: '/api/v1/admin/tools',
-    toolSearch: '/api/v1/admin/tools/test-search',
-    stations: '/api/v1/admin/stations',
-    monitorData: '/api/v1/admin/monitor-data',
-    monitorDataParams: '/api/v1/admin/monitor-data/params',
-    monitorDataSimulate: '/api/v1/admin/monitor-data/simulate'
+    toolSearch: '/api/v1/admin/tools/test-search'
+  },
+  business: {
+    stations: '/api/v1/business/stations',
+    monitorData: '/api/v1/business/monitor-data',
+    monitorDataParams: '/api/v1/business/monitor-data/params',
+    monitorDataSimulate: '/api/v1/business/monitor-data/simulate'
   },
   workspaces: {
     dashboard: '/api/v1/workspaces/dashboard',
@@ -1179,15 +1181,15 @@ export function fetchAdminTools() {
 }
 
 export function fetchAdminStations() {
-  return requestNormalized<AdminStationRecord[]>(apiRoutes.admin.stations, normalizeAdminStationList);
+  return requestNormalized<AdminStationRecord[]>(apiRoutes.business.stations, normalizeAdminStationList);
 }
 
 export function fetchAdminMonitorData() {
-  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.admin.monitorData, normalizeAdminMonitorDataList);
+  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.business.monitorData, normalizeAdminMonitorDataList);
 }
 
 export function fetchAdminMonitorDataParams() {
-  return requestNormalized<MonitorParamTemplate[]>(apiRoutes.admin.monitorDataParams, normalizeMonitorParamTemplateList);
+  return requestNormalized<MonitorParamTemplate[]>(apiRoutes.business.monitorDataParams, normalizeMonitorParamTemplateList);
 }
 
 export function createAdminModel(payload: AdminUpsertPayload) {
@@ -1247,47 +1249,47 @@ export function testAdminTools(payload: AdminUpsertPayload) {
 }
 
 export function createAdminStation(payload: AdminUpsertPayload) {
-  return requestNormalized<AdminStationRecord>(apiRoutes.admin.stations, normalizeAdminStation, {
+  return requestNormalized<AdminStationRecord>(apiRoutes.business.stations, normalizeAdminStation, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
 }
 
 export function updateAdminStation(id: string, payload: AdminUpsertPayload) {
-  return requestNormalized<AdminStationRecord>(adminResourcePath(apiRoutes.admin.stations, id), normalizeAdminStation, {
+  return requestNormalized<AdminStationRecord>(adminResourcePath(apiRoutes.business.stations, id), normalizeAdminStation, {
     method: 'PUT',
     body: JSON.stringify(payload)
   });
 }
 
 export function deleteAdminStation(id: string) {
-  return request<null>(adminResourcePath(apiRoutes.admin.stations, id), {
+  return request<null>(adminResourcePath(apiRoutes.business.stations, id), {
     method: 'DELETE'
   });
 }
 
 export function createAdminMonitorData(payload: AdminUpsertPayload) {
-  return requestNormalized<AdminMonitorDataRecord>(apiRoutes.admin.monitorData, normalizeAdminMonitorData, {
+  return requestNormalized<AdminMonitorDataRecord>(apiRoutes.business.monitorData, normalizeAdminMonitorData, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
 }
 
 export function updateAdminMonitorData(id: string, payload: AdminUpsertPayload) {
-  return requestNormalized<AdminMonitorDataRecord>(adminResourcePath(apiRoutes.admin.monitorData, id), normalizeAdminMonitorData, {
+  return requestNormalized<AdminMonitorDataRecord>(adminResourcePath(apiRoutes.business.monitorData, id), normalizeAdminMonitorData, {
     method: 'PUT',
     body: JSON.stringify(payload)
   });
 }
 
 export function deleteAdminMonitorData(id: string) {
-  return request<null>(adminResourcePath(apiRoutes.admin.monitorData, id), {
+  return request<null>(adminResourcePath(apiRoutes.business.monitorData, id), {
     method: 'DELETE'
   });
 }
 
 export function simulateAdminMonitorData(payload: AdminUpsertPayload) {
-  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.admin.monitorDataSimulate, normalizeAdminMonitorDataList, {
+  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.business.monitorDataSimulate, normalizeAdminMonitorDataList, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
