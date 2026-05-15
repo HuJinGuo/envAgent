@@ -140,7 +140,6 @@ export function UsersPage() {
     <>
       <Panel
         title="用户管理"
-        description="仅维护账号、所属角色、部门和状态，页面权限统一由角色控制。"
         action={
           <Button size="sm" onClick={() => setModalState({ mode: 'create' })}>
             <UserPlus className="h-4 w-4" />

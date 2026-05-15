@@ -346,7 +346,6 @@ export function ChatPage(props: {
     <div className="grid gap-4 xl:h-[calc(100vh-112px)] xl:grid-cols-[280px_minmax(0,1fr)]">
       <Panel
         title="记忆列表"
-        // description="只展示历史记录，按时间分组并支持上下滚动浏览。"
         className="xl:flex xl:min-h-0 xl:flex-col"
         contentClassName="xl:flex-1 xl:min-h-0"
       >
@@ -499,7 +498,6 @@ export function ChatPage(props: {
 
       <Panel
         title="AI 智能问答"
-        description="按问答主工作台方式组织消息流，压缩外围信息，把主要视线还给对话内容。"
         className="xl:flex xl:min-h-0 xl:flex-col"
         contentClassName="xl:flex-1 xl:min-h-0"
       >

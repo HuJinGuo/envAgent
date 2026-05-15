@@ -424,7 +424,7 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
           tab={modalState.tab}
           mode={modalState.mode}
           title={modalState.mode === 'create' ? `新增${tabLabel(modalState.tab)}` : `编辑${tabLabel(modalState.tab)}`}
-          description={modalState.tab === 'roles' ? '角色权限通过菜单授权控制，菜单分配请使用列表中的“菜单权限”。' : '保存后将刷新当前管理列表。'}
+          description=""
           fields={fields[modalState.tab]}
           values={formValues}
           selectOptionsByField={buildFieldOptions(modalState.tab, {

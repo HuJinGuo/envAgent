@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 export function EmptyState(props: {
   icon: LucideIcon;
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   const Icon = props.icon;
@@ -15,7 +15,9 @@ export function EmptyState(props: {
         <Icon className="h-5 w-5" />
       </div>
       <h3 className="mt-5 text-xl font-semibold text-[#303133]">{props.title}</h3>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#606266]">{props.description}</p>
+      {props.description ? (
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#606266]">{props.description}</p>
+      ) : null}
       {props.action ? <div className="mt-6">{props.action}</div> : null}
     </div>
   );

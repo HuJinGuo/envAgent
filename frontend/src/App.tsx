@@ -651,9 +651,6 @@ function App() {
                 <h1 className={cn('font-display text-white', isChatRoute ? 'text-[28px] md:text-[34px]' : 'text-3xl md:text-5xl')}>
                   {adminMeta?.title ?? activeMeta.title}
                 </h1>
-                <p className={cn('max-w-4xl text-sm leading-6 text-white/58', isChatRoute ? 'mt-1 max-w-3xl' : 'mt-2 md:text-base')}>
-                  {adminMeta?.description ?? activeMeta.description}
-                </p>
               </div>
             </div>
 

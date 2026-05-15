@@ -36,7 +36,7 @@ export function MonitorPage(props: {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <Panel title="7 日 Token 趋势" description="按日汇总模型调用量，便于观察资源消耗波动。">
+        <Panel title="7 日 Token 趋势">
           <div className="flex h-40 items-end gap-3 rounded border border-white/10 bg-white/[0.03] p-4">
             {data.trend.map((value, index) => (
               <div key={index} className="flex flex-1 flex-col items-center gap-2">
@@ -52,7 +52,7 @@ export function MonitorPage(props: {
           </div>
         </Panel>
 
-        <Panel title="服务与模型状态" description="结合真实 health 接口，把配置字段放进监控场景里。">
+        <Panel title="服务与模型状态">
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoTile label="服务状态" value={props.health?.status ?? '--'} tone={props.health?.status === 'UP' ? 'good' : 'warn'} />
             <InfoTile label="Chat Model" value={props.health?.chatModel ?? '--'} />
@@ -62,7 +62,7 @@ export function MonitorPage(props: {
         </Panel>
       </div>
 
-      <Panel title="最近调用记录" description="这一块对应文档里的调用日志和 Token 统计表。">
+      <Panel title="最近调用记录">
         <div className="workspace-table">
           <table className="w-full text-left text-sm">
             <thead className="bg-white/[0.04] text-white/50">

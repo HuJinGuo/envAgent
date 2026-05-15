@@ -157,7 +157,6 @@ export function AgentPage(props: { data?: AgentWorkspace; isLoading: boolean; er
       {/* 顶部：任务发起栏 */}
       <Panel
         title="发起新任务"
-        description="用自然语言描述任务，系统将按四段式流程执行。"
         action={
           isStreaming ? (
             <span className="flex items-center gap-2 text-sm text-amber-500">
@@ -199,7 +198,7 @@ export function AgentPage(props: { data?: AgentWorkspace; isLoading: boolean; er
       {/* 三栏主体 */}
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_260px]">
         {/* 左栏：任务历史 */}
-        <Panel title="任务历史" description={`共 ${tasks.length} 条记录`} contentClassName="space-y-2">
+        <Panel title="任务历史" contentClassName="space-y-2">
           {tasks.length === 0 ? (
             <p className="py-6 text-center text-sm text-[#94a3b8]">暂无任务，发起一个试试</p>
           ) : (
@@ -250,7 +249,6 @@ export function AgentPage(props: { data?: AgentWorkspace; isLoading: boolean; er
           {displayTask ? (
             <Panel
               title={`任务 #${displayTask.id.slice(-6)}`}
-              description={displayTask.instruction}
               action={
                 <div className="flex items-center gap-2">
                   {displayTask.status === 'RUNNING' || displayTask.status === 'PENDING' ? (
@@ -265,15 +263,14 @@ export function AgentPage(props: { data?: AgentWorkspace; isLoading: boolean; er
               <StepPipeline steps={STEPS} statuses={stepStatuses} />
             </Panel>
           ) : (
-            <Panel title="选择任务" description="从左侧选择或新建一个任务以查看详情">
-              <EmptyState icon={Bot} title="尚未选择任务" description="点击左侧任务卡片，或在顶部发起新任务。" />
+            <Panel title="选择任务">
+              <EmptyState icon={Bot} title="尚未选择任务" />
             </Panel>
           )}
 
           {displayTask ? (
             <Panel
               title=""
-              description=""
               className="overflow-hidden"
               contentClassName="p-0"
             >
@@ -319,7 +316,7 @@ export function AgentPage(props: { data?: AgentWorkspace; isLoading: boolean; er
 
         {/* 右栏：工具 + 任务信息 */}
         <div className="space-y-4">
-          <Panel title="可用工具" description="AgentTaskRunner 已注册" contentClassName="space-y-2">
+          <Panel title="可用工具" contentClassName="space-y-2">
             {tools.length === 0 ? (
               <p className="text-sm text-[#94a3b8]">加载中...</p>
             ) : (
