@@ -9,7 +9,6 @@ import com.himma.envagent.module.agent.vo.AgentPayloads.AgentLogItem;
 import com.himma.envagent.module.agent.vo.AgentPayloads.AgentTaskDetail;
 import com.himma.envagent.module.agent.vo.AgentPayloads.AgentTaskItem;
 import com.himma.envagent.module.agent.vo.AgentPayloads.CreateTaskRequest;
-import com.himma.envagent.module.agent.vo.AgentPayloads.ToolInfo;
 import com.himma.envagent.module.auth.service.UserService;
 import jakarta.validation.Valid;
 import java.io.OutputStreamWriter;
@@ -67,11 +66,6 @@ public class AgentTaskController {
     @GetMapping("/tasks/{id}")
     public ApiResponse<AgentTaskDetail> detail(@PathVariable("id") long taskId) {
         return ApiResponse.success(agentTaskService.getDetail(taskId));
-    }
-
-    @GetMapping("/tools")
-    public ApiResponse<List<ToolInfo>> tools() {
-        return ApiResponse.success(agentTaskService.listTools());
     }
 
     /**

@@ -1,8 +1,8 @@
-package com.himma.envagent.module.admin.mapper;
+package com.himma.envagent.module.agent.tool.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.himma.envagent.module.admin.entity.AgentToolEntity;
-import com.himma.envagent.module.admin.repository.row.AgentToolSearchRow;
+import com.himma.envagent.module.agent.tool.entity.AgentToolEntity;
+import com.himma.envagent.module.agent.tool.repository.row.AgentToolSearchRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;

@@ -1,7 +1,7 @@
-package com.himma.envagent.module.admin.mapper;
+package com.himma.envagent.module.agent.tool.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.himma.envagent.module.admin.entity.AgentToolRoleEntity;
+import com.himma.envagent.module.agent.tool.entity.AgentToolRoleEntity;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

@@ -1,14 +1,9 @@
-package com.himma.envagent.module.admin.entity;
+package com.himma.envagent.module.agent.tool.repository.row;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("agent_tools")
-public class AgentToolEntity {
+public class AgentToolSearchRow {
 
-    @TableId(type = IdType.INPUT)
     private Long id;
     private String name;
     private String description;
@@ -17,7 +12,6 @@ public class AgentToolEntity {
     private String tags;
     private String version;
     private Boolean enabled;
-    private String embedding;
     private String embeddingStatus;
     private String embeddingError;
     private Long hitCount;
@@ -25,6 +19,7 @@ public class AgentToolEntity {
     private Long successCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Double score;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -42,8 +37,6 @@ public class AgentToolEntity {
     public void setVersion(String version) { this.version = version; }
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
-    public String getEmbedding() { return embedding; }
-    public void setEmbedding(String embedding) { this.embedding = embedding; }
     public String getEmbeddingStatus() { return embeddingStatus; }
     public void setEmbeddingStatus(String embeddingStatus) { this.embeddingStatus = embeddingStatus; }
     public String getEmbeddingError() { return embeddingError; }
@@ -58,4 +51,6 @@ public class AgentToolEntity {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public Double getScore() { return score; }
+    public void setScore(Double score) { this.score = score; }
 }

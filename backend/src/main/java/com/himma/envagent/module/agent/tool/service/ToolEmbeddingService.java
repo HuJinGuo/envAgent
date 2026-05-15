@@ -1,7 +1,7 @@
-package com.himma.envagent.module.admin.service;
+package com.himma.envagent.module.agent.tool.service;
 
-import com.himma.envagent.module.admin.entity.AgentToolEntity;
-import com.himma.envagent.module.admin.repository.AdminRepository;
+import com.himma.envagent.module.agent.tool.entity.AgentToolEntity;
+import com.himma.envagent.module.agent.tool.repository.AgentToolRepository;
 import com.himma.envagent.module.rag.service.ModelGateway;
 import jakarta.annotation.Nullable;
 import java.time.LocalDateTime;
@@ -12,17 +12,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class ToolEmbeddingService {
 
-    private final AdminRepository adminRepository;
+    private final AgentToolRepository agentToolRepository;
     private final ModelGateway modelGateway;
 
-    public ToolEmbeddingService(AdminRepository adminRepository, ModelGateway modelGateway) {
-        this.adminRepository = adminRepository;
+    public ToolEmbeddingService(AgentToolRepository agentToolRepository, ModelGateway modelGateway) {
+        this.agentToolRepository = agentToolRepository;
         this.modelGateway = modelGateway;
     }
 
     @Async
     public void reembed(Long toolId) {
-        AgentToolEntity entity = adminRepository.toolById(toolId).orElse(null);
+        AgentToolEntity entity = agentToolRepository.findById(toolId).orElse(null);
         if (entity == null) {
             return;
         }
@@ -33,12 +33,12 @@ public class ToolEmbeddingService {
             entity.setEmbeddingStatus("READY");
             entity.setEmbeddingError(null);
             entity.setUpdatedAt(LocalDateTime.now());
-            adminRepository.updateToolEmbedding(entity);
+            agentToolRepository.updateEmbedding(entity);
         } catch (Exception exception) {
             entity.setEmbeddingStatus("FAILED");
             entity.setEmbeddingError(exception.getMessage());
             entity.setUpdatedAt(LocalDateTime.now());
-            adminRepository.updateToolEmbedding(entity);
+            agentToolRepository.updateEmbedding(entity);
         }
     }
 

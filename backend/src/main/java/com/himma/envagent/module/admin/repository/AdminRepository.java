@@ -3,8 +3,6 @@ package com.himma.envagent.module.admin.repository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.himma.envagent.module.admin.entity.AdminKnowledgeBaseEntity;
 import com.himma.envagent.module.admin.entity.AiModelEntity;
-import com.himma.envagent.module.admin.entity.AgentToolEntity;
-import com.himma.envagent.module.admin.entity.AgentToolRoleEntity;
 import com.himma.envagent.module.admin.entity.ModelVendorEntity;
 import com.himma.envagent.module.admin.entity.SysDictItemEntity;
 import com.himma.envagent.module.admin.entity.SysMenuEntity;
@@ -14,14 +12,11 @@ import com.himma.envagent.module.auth.domain.UserEntity;
 import com.himma.envagent.module.auth.mapper.UserMapper;
 import com.himma.envagent.module.admin.mapper.AdminKnowledgeBaseMapper;
 import com.himma.envagent.module.admin.mapper.AiModelMapper;
-import com.himma.envagent.module.admin.mapper.AgentToolMapper;
-import com.himma.envagent.module.admin.mapper.AgentToolRoleMapper;
 import com.himma.envagent.module.admin.mapper.ModelVendorMapper;
 import com.himma.envagent.module.admin.mapper.SysDictItemMapper;
 import com.himma.envagent.module.admin.mapper.SysMenuMapper;
 import com.himma.envagent.module.admin.mapper.SysRoleMapper;
 import com.himma.envagent.module.admin.mapper.SysRoleMenuMapper;
-import com.himma.envagent.module.admin.repository.row.AgentToolSearchRow;
 import com.himma.envagent.common.support.SnowflakeIdGenerator;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -40,35 +35,25 @@ public class AdminRepository {
     private final UserMapper userMapper;
     private final ModelVendorMapper vendorMapper;
     private final AiModelMapper modelMapper;
-    private final AgentToolMapper agentToolMapper;
-    private final AgentToolRoleMapper agentToolRoleMapper;
     private final SysDictItemMapper dictItemMapper;
     private final AdminKnowledgeBaseMapper knowledgeBaseMapper;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
-    private final boolean postgres;
 
     public AdminRepository(SysRoleMapper roleMapper, SysMenuMapper menuMapper, SysRoleMenuMapper roleMenuMapper,
                            UserMapper userMapper,
                            ModelVendorMapper vendorMapper, AiModelMapper modelMapper,
-                           AgentToolMapper agentToolMapper, AgentToolRoleMapper agentToolRoleMapper,
                            SysDictItemMapper dictItemMapper,
                            AdminKnowledgeBaseMapper knowledgeBaseMapper,
-                           SnowflakeIdGenerator snowflakeIdGenerator,
-                           DataSource dataSource) throws SQLException {
+                           SnowflakeIdGenerator snowflakeIdGenerator) {
         this.roleMapper = roleMapper;
         this.menuMapper = menuMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.userMapper = userMapper;
         this.vendorMapper = vendorMapper;
         this.modelMapper = modelMapper;
-        this.agentToolMapper = agentToolMapper;
-        this.agentToolRoleMapper = agentToolRoleMapper;
         this.dictItemMapper = dictItemMapper;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.snowflakeIdGenerator = snowflakeIdGenerator;
-        try (java.sql.Connection connection = dataSource.getConnection()) {
-            this.postgres = connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("postgres");
-        }
     }
 
     public List<SysRoleEntity> roles() {
@@ -279,79 +264,6 @@ public class AdminRepository {
         modelMapper.deleteById(id);
     }
 
-    public List<AgentToolEntity> tools() {
-        return agentToolMapper.selectList(new LambdaQueryWrapper<AgentToolEntity>()
-                .orderByAsc(AgentToolEntity::getToolGroup)
-                .orderByAsc(AgentToolEntity::getName)
-                .orderByAsc(AgentToolEntity::getId));
-    }
-
-    public Optional<AgentToolEntity> toolById(Long id) {
-        return Optional.ofNullable(agentToolMapper.selectById(id));
-    }
-
-    public Optional<AgentToolEntity> toolByName(String name) {
-        return Optional.ofNullable(agentToolMapper.selectOne(new LambdaQueryWrapper<AgentToolEntity>()
-                .eq(AgentToolEntity::getName, name)
-                .last("limit 1")));
-    }
-
-    public AgentToolEntity saveTool(AgentToolEntity entity) {
-        if (entity.getId() == null) {
-            entity.setId(snowflakeIdGenerator.nextId());
-            if (postgres) {
-                agentToolMapper.insertPostgres(entity);
-            } else {
-                agentToolMapper.insertDefault(entity);
-            }
-        } else {
-            agentToolMapper.updateById(entity);
-        }
-        return entity;
-    }
-
-    public void updateToolEmbedding(AgentToolEntity entity) {
-        agentToolMapper.updateById(entity);
-    }
-
-    public void deleteTool(Long id) {
-        agentToolRoleMapper.delete(new LambdaQueryWrapper<AgentToolRoleEntity>().eq(AgentToolRoleEntity::getToolId, id));
-        agentToolMapper.deleteById(id);
-    }
-
-    public void replaceToolRoles(Long toolId, Collection<Long> roleIds) {
-        agentToolRoleMapper.delete(new LambdaQueryWrapper<AgentToolRoleEntity>().eq(AgentToolRoleEntity::getToolId, toolId));
-        for (Long roleId : roleIds) {
-            addToolRoleIfMissing(toolId, roleId);
-        }
-    }
-
-    public void addToolRoleIfMissing(Long toolId, Long roleId) {
-        Long count = agentToolRoleMapper.selectCount(new LambdaQueryWrapper<AgentToolRoleEntity>()
-                .eq(AgentToolRoleEntity::getToolId, toolId)
-                .eq(AgentToolRoleEntity::getRoleId, roleId));
-        if (count != null && count > 0) {
-            return;
-        }
-        AgentToolRoleEntity entity = new AgentToolRoleEntity();
-        entity.setId(snowflakeIdGenerator.nextId());
-        entity.setToolId(toolId);
-        entity.setRoleId(roleId);
-        agentToolRoleMapper.insert(entity);
-    }
-
-    public List<Long> roleIdsByToolId(Long toolId) {
-        return agentToolRoleMapper.selectList(new LambdaQueryWrapper<AgentToolRoleEntity>()
-                        .eq(AgentToolRoleEntity::getToolId, toolId))
-                .stream()
-                .map(AgentToolRoleEntity::getRoleId)
-                .sorted()
-                .toList();
-    }
-
-    public List<AgentToolSearchRow> searchToolsByVector(String queryEmbedding, String groupName, Long roleId, int limit) {
-        return agentToolMapper.searchByVector(queryEmbedding, groupName, roleId, limit);
-    }
 
     public List<AdminKnowledgeBaseEntity> knowledgeBases() {
         return knowledgeBaseMapper.selectList(new LambdaQueryWrapper<AdminKnowledgeBaseEntity>()

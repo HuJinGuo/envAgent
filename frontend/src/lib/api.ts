@@ -500,9 +500,11 @@ export const apiRoutes = {
     knowledgeBases: '/api/v1/admin/knowledge-bases',
     vendors: '/api/v1/admin/vendors',
     models: '/api/v1/admin/models',
-    dictItems: '/api/v1/admin/dict-items',
-    tools: '/api/v1/admin/tools',
-    toolSearch: '/api/v1/admin/tools/test-search'
+    dictItems: '/api/v1/admin/dict-items'
+  },
+  agent: {
+    tools: '/api/v1/agent/tools',
+    toolSearch: '/api/v1/agent/tools/test-search'
   },
   business: {
     stations: '/api/v1/business/stations',
@@ -1177,7 +1179,7 @@ export function fetchAdminModels() {
 }
 
 export function fetchAdminTools() {
-  return requestNormalized<AdminToolRecord[]>(apiRoutes.admin.tools, normalizeAdminToolList);
+  return requestNormalized<AdminToolRecord[]>(apiRoutes.agent.tools, normalizeAdminToolList);
 }
 
 export function fetchAdminStations() {
@@ -1200,7 +1202,7 @@ export function createAdminModel(payload: AdminUpsertPayload) {
 }
 
 export function createAdminTool(payload: AdminUpsertPayload) {
-  return requestNormalized<AdminToolRecord>(apiRoutes.admin.tools, normalizeAdminTool, {
+  return requestNormalized<AdminToolRecord>(apiRoutes.agent.tools, normalizeAdminTool, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -1214,7 +1216,7 @@ export function updateAdminModel(id: string, payload: AdminUpsertPayload) {
 }
 
 export function updateAdminTool(id: string, payload: AdminUpsertPayload) {
-  return requestNormalized<AdminToolRecord>(adminResourcePath(apiRoutes.admin.tools, id), normalizeAdminTool, {
+  return requestNormalized<AdminToolRecord>(adminResourcePath(apiRoutes.agent.tools, id), normalizeAdminTool, {
     method: 'PUT',
     body: JSON.stringify(payload)
   });
@@ -1227,13 +1229,13 @@ export function deleteAdminModel(id: string) {
 }
 
 export function deleteAdminTool(id: string) {
-  return request<null>(adminResourcePath(apiRoutes.admin.tools, id), {
+  return request<null>(adminResourcePath(apiRoutes.agent.tools, id), {
     method: 'DELETE'
   });
 }
 
 export function replaceAdminToolRoles(id: string, roleIds: string[]) {
-  return request<null>(`${adminResourcePath(apiRoutes.admin.tools, id)}/roles`, {
+  return request<null>(`${adminResourcePath(apiRoutes.agent.tools, id)}/roles`, {
     method: 'PUT',
     body: JSON.stringify({
       roleIds
@@ -1242,7 +1244,7 @@ export function replaceAdminToolRoles(id: string, roleIds: string[]) {
 }
 
 export function testAdminTools(payload: AdminUpsertPayload) {
-  return requestNormalized<ToolSearchResult[]>(apiRoutes.admin.toolSearch, normalizeToolSearchResultList, {
+  return requestNormalized<ToolSearchResult[]>(apiRoutes.agent.toolSearch, normalizeToolSearchResultList, {
     method: 'POST',
     body: JSON.stringify(payload)
   });

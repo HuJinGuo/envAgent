@@ -14,11 +14,6 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleMenusRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.ToolItem;
-import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRolesRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.ToolSearchRequest;
-import com.himma.envagent.module.admin.vo.AdminPayloads.ToolSearchResultItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.UserItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.UserRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorItem;
@@ -192,41 +187,6 @@ public class AdminManagementController {
     @GetMapping("/knowledge-bases")
     public ApiResponse<List<KnowledgeBaseItem>> knowledgeBases(Authentication authentication) {
         return ApiResponse.success(adminManagementService.listKnowledgeBases(authentication));
-    }
-
-    @GetMapping("/tools")
-    public ApiResponse<List<ToolItem>> tools(Authentication authentication) {
-        return ApiResponse.success(adminManagementService.listTools(authentication));
-    }
-
-    @PostMapping("/tools")
-    public ApiResponse<ToolItem> createTool(Authentication authentication, @Valid @RequestBody ToolRequest request) {
-        return ApiResponse.success(adminManagementService.createTool(authentication, request));
-    }
-
-    @PutMapping("/tools/{id}")
-    public ApiResponse<ToolItem> updateTool(Authentication authentication, @PathVariable Long id,
-                                            @Valid @RequestBody ToolRequest request) {
-        return ApiResponse.success(adminManagementService.updateTool(authentication, id, request));
-    }
-
-    @DeleteMapping("/tools/{id}")
-    public ApiResponse<Void> deleteTool(Authentication authentication, @PathVariable Long id) {
-        adminManagementService.deleteTool(authentication, id);
-        return ApiResponse.success(null);
-    }
-
-    @PutMapping("/tools/{id}/roles")
-    public ApiResponse<Void> replaceToolRoles(Authentication authentication, @PathVariable Long id,
-                                              @Valid @RequestBody ToolRolesRequest request) {
-        adminManagementService.replaceToolRoles(authentication, id, request.roleIds());
-        return ApiResponse.success(null);
-    }
-
-    @PostMapping("/tools/test-search")
-    public ApiResponse<List<ToolSearchResultItem>> testSearchTools(Authentication authentication,
-                                                                   @Valid @RequestBody ToolSearchRequest request) {
-        return ApiResponse.success(adminManagementService.testSearchTools(authentication, request));
     }
 
     @PostMapping("/knowledge-bases")

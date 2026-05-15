@@ -1,4 +1,4 @@
-package com.himma.envagent.module.admin.entity;
+package com.himma.envagent.module.agent.tool.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
