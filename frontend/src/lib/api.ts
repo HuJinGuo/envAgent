@@ -222,29 +222,39 @@ export type SourceWorkspace = {
 };
 
 export type AgentWorkspace = {
-  history: Array<{
-    id: string;
-    title: string;
-    status: '完成' | '进行中';
-  }>;
-  flow: Array<{
-    id: string;
-    label: string;
-    status: 'done' | 'running' | 'pending';
-    description: string;
-  }>;
-  logs: Array<{
-    id: string;
-    status: 'done' | 'running' | 'pending';
-    line: string;
-  }>;
   tools: Array<{
     id: string;
     name: string;
     description: string;
     status: 'available' | 'coming-soon';
   }>;
-  outputPreview: string;
+};
+
+export type AgentTaskStatus = 'PENDING' | 'RUNNING' | 'DONE' | 'FAILED';
+
+export type AgentTask = {
+  id: string;
+  instruction: string;
+  status: AgentTaskStatus;
+  currentStep: string | null;
+  output: string | null;
+  errorMsg: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentTaskLog = {
+  id: string;
+  taskId: string;
+  step: string;
+  status: string;
+  line: string;
+  createdAt: string;
+};
+
+export type AgentTaskDetail = {
+  task: AgentTask;
+  logs: AgentTaskLog[];
 };
 
 export type MonitorCallRecord = {
@@ -420,6 +430,8 @@ export const apiRoutes = {
   documents: '/api/v1/documents',
   documentsUpload: '/api/v1/documents/upload',
   conversations: '/api/v1/conversations',
+  agentTasks: '/api/v1/agent/tasks',
+  agentTools: '/api/v1/agent/tools',
   admin: {
     navigation: '/api/v1/admin/navigation',
     users: '/api/v1/admin/users',
@@ -856,6 +868,71 @@ export function fetchSourceWorkspace() {
 
 export function fetchAgentWorkspace() {
   return request<AgentWorkspace>(apiRoutes.workspaces.agent);
+}
+
+export function fetchAgentTasks() {
+  return request<AgentTask[]>(apiRoutes.agentTasks);
+}
+
+export function fetchAgentTaskDetail(taskId: string) {
+  return request<AgentTaskDetail>(`${apiRoutes.agentTasks}/${taskId}`);
+}
+
+export function createAgentTask(instruction: string) {
+  return request<AgentTask>(apiRoutes.agentTasks, {
+    method: 'POST',
+    body: JSON.stringify({ instruction })
+  });
+}
+
+export async function streamAgentTask(
+  taskId: string,
+  handlers: {
+    onLog?: (log: AgentTaskLog) => void;
+    onDone?: (output: string | null) => void;
+    onError?: (message: string) => void;
+  },
+  signal?: AbortSignal
+) {
+  const response = await fetch(buildUrl(`${apiRoutes.agentTasks}/${taskId}/stream`), {
+    method: 'GET',
+    headers: buildHeaders({ headers: { Accept: 'text/event-stream' } }),
+    signal
+  });
+
+  if (!response.ok || !response.body) {
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split(/\r?\n\r?\n/);
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      const event = parseSseEvent(part);
+      if (!event) continue;
+
+      if (event.event === 'log') {
+        handlers.onLog?.(event.data as AgentTaskLog);
+      } else if (event.event === 'done') {
+        const payload = event.data as { output?: string | null } | null;
+        handlers.onDone?.(payload?.output ?? null);
+        return;
+      } else if (event.event === 'error') {
+        const payload = event.data as { message?: string } | null;
+        handlers.onError?.(payload?.message ?? 'unknown error');
+        return;
+      }
+    }
+  }
 }
 
 export function fetchMonitorWorkspace() {

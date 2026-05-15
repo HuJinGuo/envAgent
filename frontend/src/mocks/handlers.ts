@@ -305,32 +305,12 @@ const sourceWorkspace: SourceWorkspace = {
 };
 
 const agentWorkspace: AgentWorkspace = {
-  history: [
-    { id: 'a1', title: '鑫达化工合规检查', status: '完成' },
-    { id: 'a2', title: '上月废水汇总报告', status: '进行中' },
-    { id: 'a3', title: '华能 SO2 超标分析', status: '进行中' },
-    { id: 'a4', title: 'GB 16297 适用核查', status: '完成' }
-  ],
-  flow: [
-    { id: 'f1', label: '意图识别', status: 'done', description: '归类为合规检查任务' },
-    { id: 'f2', label: '知识检索', status: 'done', description: '匹配 GB 8978、HJ 91.1 等 4 份文档' },
-    { id: 'f3', label: '工具调用', status: 'running', description: '查询在线监控与许可证信息' },
-    { id: 'f4', label: '报告生成', status: 'pending', description: '等待数据与结论汇总' }
-  ],
-  logs: [
-    { id: 'l1', status: 'done', line: '意图识别 -> 合规检查任务，启动工作流' },
-    { id: 'l2', status: 'done', line: '知识库检索 -> 匹配 GB 8978、HJ 91.1 等 4 份文档' },
-    { id: 'l3', status: 'running', line: '工具调用 -> 查询在线监控数据（DW001，近 30 天）' },
-    { id: 'l4', status: 'pending', line: '待执行 -> 查询排污许可证信息' },
-    { id: 'l5', status: 'pending', line: '待执行 -> 生成超标风险说明与建议' }
-  ],
   tools: [
-    { id: 't1', name: '在线监控数据', description: '废水 / 废气实时数据', status: 'available' },
-    { id: 't2', name: '排污许可证查询', description: '企业许可信息与有效期', status: 'available' },
-    { id: 't3', name: '法规库检索', description: '法规标准与内部制度', status: 'coming-soon' },
-    { id: 't4', name: '气象数据', description: '扩散条件与天气影响', status: 'coming-soon' }
-  ],
-  outputPreview: '任务完成后，报告将在这里展示，支持复制摘要和导出 Word。'
+    { id: 'online_monitor', name: '在线监控数据', description: '废水 / 废气实时数据', status: 'available' },
+    { id: 'permit_query', name: '排污许可证查询', description: '企业许可信息与有效期', status: 'available' },
+    { id: 'regulation_search', name: '法规库检索', description: '法规标准与内部制度', status: 'coming-soon' },
+    { id: 'weather_data', name: '气象数据', description: '扩散条件与天气影响', status: 'coming-soon' }
+  ]
 };
 
 const monitorWorkspace: MonitorWorkspace = {

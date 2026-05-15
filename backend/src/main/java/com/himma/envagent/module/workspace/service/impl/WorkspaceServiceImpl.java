@@ -9,6 +9,7 @@ import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.DocumentItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.KnowledgeBaseItem;
 import com.himma.envagent.module.knowledge.vo.KnowledgePayloads.SourceItem;
 import com.himma.envagent.module.workspace.service.WorkspaceService;
+import com.himma.envagent.module.agent.service.AgentTaskService;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.AgentWorkspace;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.CallRecord;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.CategoryCount;
@@ -17,10 +18,8 @@ import com.himma.envagent.module.workspace.vo.WorkspacePayloads.ChatSession;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.ChatWorkspace;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.DashboardSnapshot;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.EnterpriseRecord;
-import com.himma.envagent.module.workspace.vo.WorkspacePayloads.FlowStep;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.KnowledgeDocument;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.KnowledgeWorkspace;
-import com.himma.envagent.module.workspace.vo.WorkspacePayloads.LogLine;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.MonitorWorkspace;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.PermissionMatrix;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.QuestionRecord;
@@ -28,7 +27,6 @@ import com.himma.envagent.module.workspace.vo.WorkspacePayloads.ReferenceCard;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.SourceWorkspace;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.StatusCard;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.SummaryCard;
-import com.himma.envagent.module.workspace.vo.WorkspacePayloads.TaskHistory;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.ToolCard;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.UsageBreakdown;
 import com.himma.envagent.module.workspace.vo.WorkspacePayloads.UsageShare;
@@ -50,15 +48,18 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private final DocumentService documentService;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ConversationService conversationService;
+    private final AgentTaskService agentTaskService;
 
     public WorkspaceServiceImpl(
             DocumentService documentService,
             KnowledgeBaseService knowledgeBaseService,
-            ConversationService conversationService
+            ConversationService conversationService,
+            AgentTaskService agentTaskService
     ) {
         this.documentService = documentService;
         this.knowledgeBaseService = knowledgeBaseService;
         this.conversationService = conversationService;
+        this.agentTaskService = agentTaskService;
     }
 
     @Override
@@ -68,8 +69,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
                 0.94,
                 (int) documentService.countDocuments(),
                 12,
-                6,
-                3,
+                (int) agentTaskService.countActive(),
+                (int) agentTaskService.countDone(),
                 0.82,
                 24.6,
                 List.of(
@@ -221,33 +222,9 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     public AgentWorkspace getAgentWorkspace() {
         return new AgentWorkspace(
-                List.of(
-                        new TaskHistory("t1", "鑫达化工合规检查", "完成"),
-                        new TaskHistory("t2", "上月废水汇总报告", "进行中"),
-                        new TaskHistory("t3", "华能 SO₂ 超标分析", "进行中"),
-                        new TaskHistory("t4", "GB16297 适用核查", "完成")
-                ),
-                List.of(
-                        new FlowStep("f1", "意图识别", "done", "识别为合规检查任务，归类到企业执法工作流。"),
-                        new FlowStep("f2", "知识检索", "done", "命中 GB 8978、HJ 91.1 与许可证摘要。"),
-                        new FlowStep("f3", "工具调用", "running", "正在轮询在线监测与许可证工具的聚合结果。"),
-                        new FlowStep("f4", "生成报告", "pending", "等待工具结果收齐后生成最终报告。")
-                ),
-                List.of(
-                        new LogLine("l1", "done", "意图识别 -> 合规检查任务，启动工作流"),
-                        new LogLine("l2", "done", "知识库检索 -> 匹配 4 份法规与许可证文档"),
-                        new LogLine("l3", "done", "工具调用 -> 查询在线监控数据（DW001，近 30 天）"),
-                        new LogLine("l4", "running", "工具调用 -> 查询排污许可证信息"),
-                        new LogLine("l5", "pending", "待执行 -> 生成合规分析报告"),
-                        new LogLine("l6", "pending", "待执行 -> 标注超标风险点")
-                ),
-                List.of(
-                        new ToolCard("tool1", "在线监控数据", "废水/废气实时数据", "available"),
-                        new ToolCard("tool2", "排污许可证查询", "企业许可信息", "available"),
-                        new ToolCard("tool3", "法规库检索", "法规标准结构化检索", "coming-soon"),
-                        new ToolCard("tool4", "气象数据", "辅助分析扩散与异常波动", "coming-soon")
-                ),
-                "系统已完成任务编排骨架、权限联调和工具状态面板，下一阶段可把这里替换成真实 Agent 任务执行结果。"
+                agentTaskService.listTools().stream()
+                        .map(t -> new ToolCard(t.id(), t.name(), t.description(), t.status()))
+                        .toList()
         );
     }
 

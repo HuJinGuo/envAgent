@@ -52,17 +52,18 @@ export function BarRow(props: { label: string; value: number; color: string }) {
   );
 }
 
-export function StatusDot(props: { status: 'done' | 'running' | 'pending' }) {
+export function StatusDot(props: { status: 'done' | 'running' | 'pending' | 'failed' }) {
   return (
     <span
       className={cn(
         'mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px]',
         props.status === 'done' && 'bg-emerald-400/18 text-emerald-100',
         props.status === 'running' && 'bg-amber-300/18 text-amber-50',
-        props.status === 'pending' && 'bg-white/10 text-white/45'
+        props.status === 'pending' && 'bg-white/10 text-white/45',
+        props.status === 'failed' && 'bg-red-400/18 text-red-300'
       )}
     >
-      {props.status === 'done' ? '✓' : props.status === 'running' ? '•' : '·'}
+      {props.status === 'done' ? '✓' : props.status === 'running' ? '•' : props.status === 'failed' ? '✗' : '·'}
     </span>
   );
 }

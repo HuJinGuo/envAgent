@@ -96,22 +96,7 @@ public final class WorkspacePayloads {
     ) {
     }
 
-    public record AgentWorkspace(
-            List<TaskHistory> history,
-            List<FlowStep> flow,
-            List<LogLine> logs,
-            List<ToolCard> tools,
-            String outputPreview
-    ) {
-    }
-
-    public record TaskHistory(String id, String title, String status) {
-    }
-
-    public record FlowStep(String id, String label, String status, String description) {
-    }
-
-    public record LogLine(String id, String status, String line) {
+    public record AgentWorkspace(List<ToolCard> tools) {
     }
 
     public record ToolCard(String id, String name, String description, String status) {
