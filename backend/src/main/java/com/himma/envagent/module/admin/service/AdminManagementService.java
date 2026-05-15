@@ -4,7 +4,10 @@ import com.himma.envagent.common.exception.BusinessException;
 import com.himma.envagent.module.admin.domain.AdminRecords.DefaultMenu;
 import com.himma.envagent.module.admin.entity.AdminKnowledgeBaseEntity;
 import com.himma.envagent.module.admin.entity.AiModelEntity;
+import com.himma.envagent.module.admin.entity.AgentToolEntity;
+import com.himma.envagent.module.admin.entity.MonitorDataEntity;
 import com.himma.envagent.module.admin.entity.ModelVendorEntity;
+import com.himma.envagent.module.admin.entity.MonitorStationEntity;
 import com.himma.envagent.module.admin.entity.SysDictItemEntity;
 import com.himma.envagent.module.admin.entity.SysMenuEntity;
 import com.himma.envagent.module.admin.entity.SysRoleEntity;
@@ -16,10 +19,20 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.KnowledgeBaseRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.MenuTreeItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRangeRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.MonitorDataSimulateRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.ModelRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.RoleRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.StationItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.StationRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.ToolItem;
+import com.himma.envagent.module.admin.vo.AdminPayloads.ToolRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.ToolSearchRequest;
+import com.himma.envagent.module.admin.vo.AdminPayloads.ToolSearchResultItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.UserItem;
 import com.himma.envagent.module.admin.vo.AdminPayloads.UserRequest;
 import com.himma.envagent.module.admin.vo.AdminPayloads.VendorItem;
@@ -27,13 +40,18 @@ import com.himma.envagent.module.admin.vo.AdminPayloads.VendorRequest;
 import com.himma.envagent.module.auth.domain.UserEntity;
 import com.himma.envagent.module.auth.domain.UserRole;
 import com.himma.envagent.module.auth.domain.UserStatus;
+import com.himma.envagent.module.rag.service.ModelGateway;
 import com.himma.envagent.module.workspace.service.WorkspaceAccessService;
 import jakarta.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -50,24 +68,45 @@ public class AdminManagementService {
             new DefaultMenu("agent", null, "Agent", "Agent", "/agent", "AgentView", "Bot", null, 50),
             new DefaultMenu("monitor", null, "Monitor", "系统监控", "/monitor", "MonitorView", "Activity", null, 60),
             new DefaultMenu("admin", null, "Admin", "基础管理", "/admin", null, "Settings", "/admin/users", 70),
+            new DefaultMenu("business", null, "Business", "业务管理", "/business", null, "BriefcaseBusiness", "/business/stations", 80),
             new DefaultMenu("users", "admin", "Users", "用户管理", "/admin/users", "UsersView", "Users", null, 10),
             new DefaultMenu("roles", "admin", "Roles", "角色管理", "/admin/roles", "AdminView", "ShieldCheck", null, 20),
             new DefaultMenu("menus", "admin", "Menus", "菜单管理", "/admin/menus", "AdminView", "Layers", null, 30),
             new DefaultMenu("knowledge-bases", "admin", "Knowledge Bases", "知识库管理", "/admin/knowledge-bases", "AdminView", "Database", null, 40),
             new DefaultMenu("vendors", "admin", "Vendors", "厂商管理", "/admin/vendors", "AdminView", "Settings", null, 50),
             new DefaultMenu("models", "admin", "Models", "模型管理", "/admin/models", "AdminView", "Settings2", null, 60),
-            new DefaultMenu("dictionaries", "admin", "Dictionaries", "业务字典", "/admin/dictionaries", "AdminView", "BookText", null, 70)
+            new DefaultMenu("dictionaries", "admin", "Dictionaries", "业务字典", "/admin/dictionaries", "AdminView", "BookText", null, 70),
+            new DefaultMenu("tools", "admin", "Tools", "工具管理", "/admin/tools", "AdminView", "Wrench", null, 80),
+            new DefaultMenu("stations", "business", "Stations", "站点管理", "/business/stations", "AdminView", "MapPinned", null, 10),
+            new DefaultMenu("monitor-data", "business", "Monitor Data", "监测数据", "/business/monitor-data", "AdminView", "ChartColumnBig", null, 20)
+    );
+
+    private static final List<MonitorDataRangeRequest> DEFAULT_MONITOR_PARAMS = List.of(
+            new MonitorDataRangeRequest("TN", "总氮", 1.2, 2.4),
+            new MonitorDataRangeRequest("TP", "总磷", 0.03, 0.18),
+            new MonitorDataRangeRequest("NH3N", "氨氮", 0.08, 0.9),
+            new MonitorDataRangeRequest("PH", "ph", 6.8, 8.2),
+            new MonitorDataRangeRequest("CODMN", "高猛", 2.0, 6.5),
+            new MonitorDataRangeRequest("WL", "水位", 2.5, 4.6),
+            new MonitorDataRangeRequest("VS", "流速", 0.05, 0.8),
+            new MonitorDataRangeRequest("Q", "流量", 15.0, 180.0)
     );
 
     private final AdminRepository adminRepository;
     private final WorkspaceAccessService workspaceAccessService;
     private final PasswordEncoder passwordEncoder;
+    private final ToolEmbeddingService toolEmbeddingService;
+    private final ModelGateway modelGateway;
 
     public AdminManagementService(AdminRepository adminRepository, WorkspaceAccessService workspaceAccessService,
-                                  PasswordEncoder passwordEncoder) {
+                                  PasswordEncoder passwordEncoder,
+                                  ToolEmbeddingService toolEmbeddingService,
+                                  ModelGateway modelGateway) {
         this.adminRepository = adminRepository;
         this.workspaceAccessService = workspaceAccessService;
         this.passwordEncoder = passwordEncoder;
+        this.toolEmbeddingService = toolEmbeddingService;
+        this.modelGateway = modelGateway;
     }
 
     @PostConstruct
@@ -80,7 +119,7 @@ public class AdminManagementService {
             ensureMenu(menu);
         }
         ensureRoleMenus("ADMIN", List.of("dash", "chat", "source", "kb", "agent", "monitor", "admin", "users", "roles", "menus",
-                "knowledge-bases", "vendors", "models", "dictionaries"));
+                "knowledge-bases", "vendors", "models", "dictionaries", "tools", "business", "stations", "monitor-data"));
         ensureDictItem("COMMON_STATUS", "启用", "ACTIVE", "通用启用状态", 10);
         ensureDictItem("COMMON_STATUS", "停用", "DISABLED", "通用停用状态", 20);
         ensureDictItem("MODEL_TYPE", "对话模型", "CHAT", "面向聊天与推理问答", 10);
@@ -88,6 +127,9 @@ public class AdminManagementService {
         ensureRoleMenus("ANALYST", List.of("dash", "chat", "source", "kb", "agent"));
         ensureRoleMenus("INSPECTOR", List.of("dash", "chat", "source"));
         ensureVendorAndModel();
+        ensureTools();
+        ensureStations();
+        ensureMonitorDataSamples();
     }
 
     public List<RoleItem> listRoles(Authentication authentication) {
@@ -268,6 +310,82 @@ public class AdminManagementService {
         return adminRepository.knowledgeBases().stream().map(this::toKnowledgeBaseItem).toList();
     }
 
+    public List<ToolItem> listTools(Authentication authentication) {
+        requireAdmin(authentication);
+        return adminRepository.tools().stream().map(this::toToolItem).toList();
+    }
+
+    @Transactional
+    public ToolItem createTool(Authentication authentication, ToolRequest request) {
+        requireAdmin(authentication);
+        adminRepository.toolByName(request.name().trim()).ifPresent((tool) -> {
+            throw new BusinessException(409, "工具名称已存在");
+        });
+        AgentToolEntity entity = applyTool(new AgentToolEntity(), request);
+        entity.setEmbeddingStatus("PENDING");
+        entity.setEmbeddingError(null);
+        AgentToolEntity saved = adminRepository.saveTool(entity);
+        toolEmbeddingService.reembed(saved.getId());
+        return toToolItem(saved);
+    }
+
+    @Transactional
+    public ToolItem updateTool(Authentication authentication, Long id, ToolRequest request) {
+        requireAdmin(authentication);
+        AgentToolEntity entity = adminRepository.toolById(id)
+                .orElseThrow(() -> new BusinessException(404, "工具不存在"));
+        adminRepository.toolByName(request.name().trim())
+                .filter((tool) -> !tool.getId().equals(id))
+                .ifPresent((tool) -> {
+                    throw new BusinessException(409, "工具名称已存在");
+                });
+        boolean shouldReembed = toolCoreChanged(entity, request);
+        AgentToolEntity updated = applyTool(entity, request);
+        if (shouldReembed) {
+            updated.setEmbeddingStatus("PENDING");
+            updated.setEmbeddingError(null);
+        }
+        AgentToolEntity saved = adminRepository.saveTool(updated);
+        if (shouldReembed) {
+            toolEmbeddingService.reembed(saved.getId());
+        }
+        return toToolItem(saved);
+    }
+
+    @Transactional
+    public void deleteTool(Authentication authentication, Long id) {
+        requireAdmin(authentication);
+        adminRepository.deleteTool(id);
+    }
+
+    @Transactional
+    public void replaceToolRoles(Authentication authentication, Long id, List<Long> roleIds) {
+        requireAdmin(authentication);
+        adminRepository.toolById(id).orElseThrow(() -> new BusinessException(404, "工具不存在"));
+        for (Long roleId : roleIds) {
+            adminRepository.roleById(roleId)
+                    .orElseThrow(() -> new BusinessException(400, "存在无效角色ID: " + roleId));
+        }
+        adminRepository.replaceToolRoles(id, roleIds);
+    }
+
+    public List<ToolSearchResultItem> testSearchTools(Authentication authentication, ToolSearchRequest request) {
+        requireAdmin(authentication);
+        List<float[]> embeddings = modelGateway.embed(List.of(request.query().trim()));
+        if (embeddings.isEmpty()) {
+            throw new BusinessException(500, "工具检索向量生成失败");
+        }
+        Long roleId = null;
+        if (request.roleCode() != null && !request.roleCode().isBlank()) {
+            roleId = adminRepository.roleByCode(request.roleCode().trim())
+                    .orElseThrow(() -> new BusinessException(400, "角色编码不存在"))
+                    .getId();
+        }
+        String queryVector = formatEmbedding(embeddings.get(0));
+        int limit = request.limit() == null || request.limit() <= 0 ? 8 : Math.min(request.limit(), 20);
+        return rankToolSearchResults(queryVector, embeddings.get(0), request.groupName(), roleId, limit);
+    }
+
     @Transactional
     public KnowledgeBaseItem createKnowledgeBase(Authentication authentication, KnowledgeBaseRequest request) {
         requireAdmin(authentication);
@@ -286,6 +404,109 @@ public class AdminManagementService {
     public void deleteKnowledgeBase(Authentication authentication, Long id) {
         requireAdmin(authentication);
         adminRepository.deleteKnowledgeBase(id);
+    }
+
+    public List<StationItem> listStations(Authentication authentication) {
+        requireAdmin(authentication);
+        return adminRepository.stations().stream().map(this::toStationItem).toList();
+    }
+
+    @Transactional
+    public StationItem createStation(Authentication authentication, StationRequest request) {
+        requireAdmin(authentication);
+        validateStationUniqueness(request, null);
+        return toStationItem(adminRepository.saveStation(applyStation(new MonitorStationEntity(), request)));
+    }
+
+    @Transactional
+    public StationItem updateStation(Authentication authentication, Long id, StationRequest request) {
+        requireAdmin(authentication);
+        MonitorStationEntity entity = adminRepository.stationById(id)
+                .orElseThrow(() -> new BusinessException(404, "站点不存在"));
+        validateStationUniqueness(request, id);
+        return toStationItem(adminRepository.saveStation(applyStation(entity, request)));
+    }
+
+    @Transactional
+    public void deleteStation(Authentication authentication, Long id) {
+        requireAdmin(authentication);
+        adminRepository.deleteStation(id);
+    }
+
+    public List<MonitorDataItem> listMonitorData(Authentication authentication) {
+        requireAdmin(authentication);
+        return adminRepository.monitorData().stream().map(this::toMonitorDataItem).toList();
+    }
+
+    @Transactional
+    public MonitorDataItem createMonitorData(Authentication authentication, MonitorDataRequest request) {
+        requireAdmin(authentication);
+        validateMonitorDataRequest(request);
+        return toMonitorDataItem(adminRepository.saveMonitorData(applyMonitorData(new MonitorDataEntity(), request)));
+    }
+
+    @Transactional
+    public MonitorDataItem updateMonitorData(Authentication authentication, Long id, MonitorDataRequest request) {
+        requireAdmin(authentication);
+        MonitorDataEntity entity = adminRepository.monitorDataById(id)
+                .orElseThrow(() -> new BusinessException(404, "监测数据不存在"));
+        validateMonitorDataRequest(request);
+        return toMonitorDataItem(adminRepository.saveMonitorData(applyMonitorData(entity, request)));
+    }
+
+    @Transactional
+    public void deleteMonitorData(Authentication authentication, Long id) {
+        requireAdmin(authentication);
+        adminRepository.deleteMonitorData(id);
+    }
+
+    @Transactional
+    public List<MonitorDataItem> simulateMonitorData(Authentication authentication, MonitorDataSimulateRequest request) {
+        requireAdmin(authentication);
+        if (request.ranges() == null || request.ranges().isEmpty()) {
+            throw new BusinessException(400, "至少需要配置一个监测参数范围");
+        }
+        String targetMn = request.mn().trim();
+        List<MonitorDataRangeRequest> ranges = request.ranges().stream()
+                .sorted(Comparator.comparing(MonitorDataRangeRequest::paramCode))
+                .toList();
+        for (MonitorDataRangeRequest range : ranges) {
+            validateMonitorRange(range);
+        }
+        List<MonitorDataItem> generated = new ArrayList<>();
+        List<String> targetMns;
+        if ("ALL".equalsIgnoreCase(targetMn)) {
+            targetMns = adminRepository.stations().stream()
+                    .map(MonitorStationEntity::getMn)
+                    .sorted()
+                    .toList();
+            if (targetMns.isEmpty()) {
+                throw new BusinessException(400, "当前暂无可用站点，无法模拟全部站点数据");
+            }
+        } else {
+            requireExistingStationMn(targetMn);
+            targetMns = List.of(targetMn);
+        }
+
+        for (String mn : targetMns) {
+            adminRepository.deleteMonitorDataByMnAndTime(mn, request.dataTime());
+            for (MonitorDataRangeRequest range : ranges) {
+                MonitorDataEntity entity = new MonitorDataEntity();
+                entity.setMn(mn);
+                entity.setParamCode(range.paramCode().trim());
+                entity.setParamName(range.paramName().trim());
+                entity.setMeasureValue(randomValue(range.minValue(), range.maxValue()));
+                entity.setDataTime(request.dataTime());
+                entity.setUpdatedAt(LocalDateTime.now());
+                generated.add(toMonitorDataItem(adminRepository.saveMonitorData(entity)));
+            }
+        }
+        return generated;
+    }
+
+    public List<MonitorDataRangeRequest> listMonitorParamTemplates(Authentication authentication) {
+        requireAdmin(authentication);
+        return DEFAULT_MONITOR_PARAMS;
     }
 
     private void requireAdmin(Authentication authentication) {
@@ -378,6 +599,104 @@ public class AdminManagementService {
         }
     }
 
+    private void ensureTools() {
+        ensureTool("weather_lookup", "天气查询", "查询指定地区的实时天气、未来24小时天气和空气质量信息。", """
+                {
+                  "type": "object",
+                  "properties": {
+                    "location": { "type": "string", "description": "地区名称，例如无锡" },
+                    "date": { "type": "string", "description": "日期，可传 today" }
+                  },
+                  "required": ["location"]
+                }
+                """, "environment", List.of("天气", "气象", "出行"), "1.0.0", List.of("ADMIN", "ANALYST"));
+        ensureTool("station_overview", "站点概览", "根据站点编码或 MN 查询站点名称、坐标、站点类型和运行状态。", """
+                {
+                  "type": "object",
+                  "properties": {
+                    "mn": { "type": "string" },
+                    "stationId": { "type": "string" }
+                  }
+                }
+                """, "monitoring", List.of("站点", "监测点", "太湖"), "1.0.0", List.of("ADMIN", "ANALYST"));
+        ensureTool("mail_sender", "邮件发送", "向指定收件人发送告警通知、日报或问答结果摘要邮件。", """
+                {
+                  "type": "object",
+                  "properties": {
+                    "to": { "type": "array", "items": { "type": "string" } },
+                    "subject": { "type": "string" },
+                    "content": { "type": "string" }
+                  },
+                  "required": ["to", "subject", "content"]
+                }
+                """, "office", List.of("邮件", "通知", "发送"), "1.0.0", List.of("ADMIN"));
+    }
+
+    private void ensureTool(String name, String title, String description, String parametersSchema,
+                            String groupName, List<String> tags, String version, List<String> roleCodes) {
+        AgentToolEntity entity = adminRepository.toolByName(name).orElseGet(AgentToolEntity::new);
+        boolean createMode = entity.getId() == null;
+        entity.setName(name);
+        entity.setDescription(description);
+        entity.setParametersSchema(parametersSchema);
+        entity.setToolGroup(groupName);
+        entity.setTags(String.join(",", tags));
+        entity.setVersion(version);
+        entity.setEnabled(true);
+        entity.setHitCount(entity.getHitCount() == null ? 0L : entity.getHitCount());
+        entity.setCallCount(entity.getCallCount() == null ? 0L : entity.getCallCount());
+        entity.setSuccessCount(entity.getSuccessCount() == null ? 0L : entity.getSuccessCount());
+        entity.setEmbeddingStatus(entity.getEmbeddingStatus() == null ? "PENDING" : entity.getEmbeddingStatus());
+        entity.setUpdatedAt(LocalDateTime.now());
+        AgentToolEntity saved = adminRepository.saveTool(entity);
+        for (String roleCode : roleCodes) {
+            Long roleId = adminRepository.roleByCode(roleCode).orElseThrow().getId();
+            adminRepository.addToolRoleIfMissing(saved.getId(), roleId);
+        }
+        if (createMode || saved.getEmbedding() == null || saved.getEmbedding().isBlank()) {
+            toolEmbeddingService.reembed(saved.getId());
+        }
+    }
+
+    private void ensureStations() {
+        ensureStation("TH-WX-001", "320200A001", 31.4382, 120.2096, "太湖梅梁湖心", 21);
+        ensureStation("TH-WX-002", "320200A002", 31.3745, 120.1688, "太湖北部湖心", 21);
+        ensureStation("TH-WX-003", "320200A003", 31.2874, 120.2203, "太湖贡湖湾口", 21);
+        ensureStation("TH-WX-004", "320200A004", 31.2258, 120.1107, "太湖拖山近岸", 21);
+    }
+
+    private void ensureMonitorDataSamples() {
+        if (!adminRepository.monitorData().isEmpty()) {
+            return;
+        }
+        LocalDateTime sampleTime = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0);
+        for (MonitorStationEntity station : adminRepository.stations()) {
+            adminRepository.deleteMonitorDataByMnAndTime(station.getMn(), sampleTime);
+            for (MonitorDataRangeRequest range : DEFAULT_MONITOR_PARAMS) {
+                MonitorDataEntity entity = new MonitorDataEntity();
+                entity.setMn(station.getMn());
+                entity.setParamCode(range.paramCode());
+                entity.setParamName(range.paramName());
+                entity.setMeasureValue(randomValue(range.minValue(), range.maxValue()));
+                entity.setDataTime(sampleTime);
+                entity.setUpdatedAt(LocalDateTime.now());
+                adminRepository.saveMonitorData(entity);
+            }
+        }
+    }
+
+    private void ensureStation(String stationId, String mn, double lat, double lng, String mnName, int st) {
+        MonitorStationEntity entity = adminRepository.stationByStationId(stationId).orElseGet(MonitorStationEntity::new);
+        entity.setStationId(stationId);
+        entity.setMn(mn);
+        entity.setLat(lat);
+        entity.setLng(lng);
+        entity.setMnName(mnName);
+        entity.setSt(st);
+        entity.setUpdatedAt(LocalDateTime.now());
+        adminRepository.saveStation(entity);
+    }
+
     private SysRoleEntity applyRole(SysRoleEntity entity, RoleRequest request) {
         entity.setCode(request.code());
         entity.setName(request.name());
@@ -459,6 +778,21 @@ public class AdminManagementService {
         return entity;
     }
 
+    private AgentToolEntity applyTool(AgentToolEntity entity, ToolRequest request) {
+        entity.setName(request.name().trim());
+        entity.setDescription(request.description());
+        entity.setParametersSchema(request.parametersSchema());
+        entity.setToolGroup(request.toolGroup() == null ? null : request.toolGroup().trim());
+        entity.setTags(joinTags(request.tags()));
+        entity.setVersion(request.version() == null || request.version().isBlank() ? "1.0.0" : request.version().trim());
+        entity.setEnabled(request.enabled() == null || request.enabled());
+        entity.setHitCount(entity.getHitCount() == null ? 0L : entity.getHitCount());
+        entity.setCallCount(entity.getCallCount() == null ? 0L : entity.getCallCount());
+        entity.setSuccessCount(entity.getSuccessCount() == null ? 0L : entity.getSuccessCount());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
     private AdminKnowledgeBaseEntity applyKnowledgeBase(AdminKnowledgeBaseEntity entity, KnowledgeBaseRequest request) {
         entity.setCode(request.code());
         entity.setName(request.name());
@@ -467,6 +801,63 @@ public class AdminManagementService {
         entity.setCreatedBy(request.createdBy());
         entity.setUpdatedAt(LocalDateTime.now());
         return entity;
+    }
+
+    private MonitorStationEntity applyStation(MonitorStationEntity entity, StationRequest request) {
+        entity.setStationId(request.stationId().trim());
+        entity.setMn(request.mn().trim());
+        entity.setLat(request.lat());
+        entity.setLng(request.lng());
+        entity.setMnName(request.mnName().trim());
+        entity.setSt(request.st());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
+    private MonitorDataEntity applyMonitorData(MonitorDataEntity entity, MonitorDataRequest request) {
+        entity.setMn(request.mn().trim());
+        entity.setParamCode(request.paramCode().trim());
+        entity.setParamName(request.paramName().trim());
+        entity.setMeasureValue(request.value());
+        entity.setDataTime(request.dataTime());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
+    private void validateStationUniqueness(StationRequest request, Long currentId) {
+        adminRepository.stationByStationId(request.stationId().trim())
+                .filter(item -> currentId == null || !item.getId().equals(currentId))
+                .ifPresent(item -> {
+                    throw new BusinessException(409, "站点编码已存在");
+                });
+        adminRepository.stationByMn(request.mn().trim())
+                .filter(item -> currentId == null || !item.getId().equals(currentId))
+                .ifPresent(item -> {
+                    throw new BusinessException(409, "MN 编号已存在");
+                });
+    }
+
+    private void validateMonitorDataRequest(MonitorDataRequest request) {
+        requireExistingStationMn(request.mn().trim());
+        if (request.paramCode().isBlank() || request.paramName().isBlank()) {
+            throw new BusinessException(400, "监测参数不能为空");
+        }
+    }
+
+    private void validateMonitorRange(MonitorDataRangeRequest range) {
+        if (range.minValue() > range.maxValue()) {
+            throw new BusinessException(400, range.paramName() + " 的最小值不能大于最大值");
+        }
+    }
+
+    private void requireExistingStationMn(String mn) {
+        adminRepository.stationByMn(mn)
+                .orElseThrow(() -> new BusinessException(400, "未找到对应站点 MN"));
+    }
+
+    private double randomValue(double minValue, double maxValue) {
+        double value = minValue + (maxValue - minValue) * ThreadLocalRandom.current().nextDouble();
+        return Math.round(value * 1000D) / 1000D;
     }
 
     private List<MenuTreeItem> buildTree(List<SysMenuEntity> menus) {
@@ -540,5 +931,203 @@ public class AdminManagementService {
     private KnowledgeBaseItem toKnowledgeBaseItem(AdminKnowledgeBaseEntity entity) {
         return new KnowledgeBaseItem(entity.getId(), entity.getCode(), entity.getName(), entity.getDescription(),
                 entity.getSortOrder(), entity.getCreatedBy(), entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    private ToolItem toToolItem(AgentToolEntity entity) {
+        List<Long> roleIds = adminRepository.roleIdsByToolId(entity.getId());
+        List<SysRoleEntity> roles = roleIds.stream()
+                .map(adminRepository::roleById)
+                .flatMap(Optional::stream)
+                .toList();
+        long callCount = entity.getCallCount() == null ? 0L : entity.getCallCount();
+        long successCount = entity.getSuccessCount() == null ? 0L : entity.getSuccessCount();
+        double successRate = callCount == 0 ? 0D : (double) successCount / (double) callCount;
+        return new ToolItem(
+                entity.getId(),
+                entity.getName(),
+                entity.getDescription(),
+                entity.getParametersSchema(),
+                entity.getToolGroup(),
+                splitTags(entity.getTags()),
+                entity.getVersion(),
+                entity.getEnabled(),
+                entity.getEmbeddingStatus(),
+                entity.getEmbeddingError(),
+                entity.getHitCount() == null ? 0L : entity.getHitCount(),
+                callCount,
+                successCount,
+                successRate,
+                roleIds,
+                roles.stream().map(SysRoleEntity::getCode).toList(),
+                roles.stream().map(SysRoleEntity::getName).toList(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private StationItem toStationItem(MonitorStationEntity entity) {
+        return new StationItem(
+                entity.getId(),
+                entity.getStationId(),
+                entity.getMn(),
+                entity.getLat(),
+                entity.getLng(),
+                entity.getMnName(),
+                entity.getSt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private MonitorDataItem toMonitorDataItem(MonitorDataEntity entity) {
+        return new MonitorDataItem(
+                entity.getId(),
+                entity.getMn(),
+                entity.getParamCode(),
+                entity.getParamName(),
+                entity.getMeasureValue(),
+                entity.getDataTime(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private boolean toolCoreChanged(AgentToolEntity entity, ToolRequest request) {
+        return !normalizeText(entity.getName()).equals(normalizeText(request.name()))
+                || !normalizeText(entity.getDescription()).equals(normalizeText(request.description()))
+                || !normalizeText(entity.getParametersSchema()).equals(normalizeText(request.parametersSchema()));
+    }
+
+    private List<ToolSearchResultItem> rankToolSearchResults(String queryVector, float[] queryEmbedding,
+                                                             String groupName, Long roleId, int limit) {
+        List<com.himma.envagent.module.admin.repository.row.AgentToolSearchRow> vectorResults =
+                adminRepository.searchToolsByVector(queryVector, normalizeNullable(groupName), roleId, limit);
+        if (!vectorResults.isEmpty()) {
+            return vectorResults.stream()
+                    .map((item) -> new ToolSearchResultItem(
+                            item.getId(),
+                            item.getName(),
+                            item.getToolGroup(),
+                            item.getDescription(),
+                            item.getScore() == null ? 0D : item.getScore(),
+                            item.getEmbeddingStatus(),
+                            roleCodesByTool(item.getId()),
+                            roleNamesByTool(item.getId()),
+                            splitTags(item.getTags())
+                    ))
+                    .toList();
+        }
+        return adminRepository.tools().stream()
+                .filter((tool) -> Boolean.TRUE.equals(tool.getEnabled()))
+                .filter((tool) -> "READY".equalsIgnoreCase(normalizeText(tool.getEmbeddingStatus())))
+                .filter((tool) -> groupName == null || groupName.isBlank() || normalizeText(groupName).equals(normalizeText(tool.getToolGroup())))
+                .filter((tool) -> roleId == null || adminRepository.roleIdsByToolId(tool.getId()).contains(roleId))
+                .map((tool) -> new ToolSearchResultItem(
+                        tool.getId(),
+                        tool.getName(),
+                        tool.getToolGroup(),
+                        tool.getDescription(),
+                        cosine(queryEmbedding, parseEmbedding(tool.getEmbedding())),
+                        tool.getEmbeddingStatus(),
+                        roleCodesByTool(tool.getId()),
+                        roleNamesByTool(tool.getId()),
+                        splitTags(tool.getTags())
+                ))
+                .sorted(Comparator.comparingDouble(ToolSearchResultItem::similarity).reversed())
+                .limit(limit)
+                .toList();
+    }
+
+    private List<String> roleCodesByTool(Long toolId) {
+        return adminRepository.roleIdsByToolId(toolId).stream()
+                .map(adminRepository::roleById)
+                .flatMap(Optional::stream)
+                .map(SysRoleEntity::getCode)
+                .toList();
+    }
+
+    private List<String> roleNamesByTool(Long toolId) {
+        return adminRepository.roleIdsByToolId(toolId).stream()
+                .map(adminRepository::roleById)
+                .flatMap(Optional::stream)
+                .map(SysRoleEntity::getName)
+                .toList();
+    }
+
+    private String joinTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return "";
+        }
+        return tags.stream()
+                .map(this::normalizeText)
+                .filter((item) -> !item.isBlank())
+                .distinct()
+                .collect(Collectors.joining(","));
+    }
+
+    private List<String> splitTags(String tags) {
+        if (tags == null || tags.isBlank()) {
+            return List.of();
+        }
+        return List.of(tags.split(",")).stream()
+                .map(String::trim)
+                .filter((item) -> !item.isBlank())
+                .toList();
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String normalizeNullable(String value) {
+        String normalized = normalizeText(value);
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String formatEmbedding(float[] embedding) {
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(embedding[i]);
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private float[] parseEmbedding(String value) {
+        if (value == null || value.isBlank()) {
+            return new float[0];
+        }
+        String trimmed = value.trim();
+        String body = trimmed.startsWith("[") && trimmed.endsWith("]")
+                ? trimmed.substring(1, trimmed.length() - 1)
+                : trimmed;
+        if (body.isBlank()) {
+            return new float[0];
+        }
+        String[] parts = body.split(",");
+        float[] vector = new float[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            vector[i] = Float.parseFloat(parts[i].trim());
+        }
+        return vector;
+    }
+
+    private double cosine(float[] left, float[] right) {
+        int length = Math.min(left.length, right.length);
+        double dot = 0D;
+        double leftNorm = 0D;
+        double rightNorm = 0D;
+        for (int i = 0; i < length; i++) {
+            dot += left[i] * right[i];
+            leftNorm += left[i] * left[i];
+            rightNorm += right[i] * right[i];
+        }
+        if (leftNorm == 0D || rightNorm == 0D) {
+            return 0D;
+        }
+        return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
     }
 }

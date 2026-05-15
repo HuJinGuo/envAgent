@@ -23,7 +23,7 @@ import { Badge } from './components/ui/badge';
 import { Button } from './components/ui/button';
 import { EmptyState } from './components/ui/empty-state';
 import { Input } from './components/ui/input';
-import { adminTabMeta, resolveAdminTab } from './lib/admin-tabs';
+import { adminTabMeta, resolveAdminTab, type AdminTab } from './lib/admin-tabs';
 import {
   fallbackWorkspaceRoutes,
   getWorkspaceRouteByPath,
@@ -62,7 +62,7 @@ type WorkspaceRenderContext = {
   usersQuery: any;
   selectedUser: unknown;
   setUserId: (id: string | null) => void;
-  adminTab: 'roles' | 'menus' | 'knowledgeBases' | 'vendors' | 'models' | 'dictionaries';
+  adminTab: AdminTab;
 };
 
 const routePropBuilders: Record<WorkspaceRouteKey, (context: WorkspaceRenderContext) => Record<string, unknown>> = {

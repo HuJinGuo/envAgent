@@ -1,4 +1,4 @@
-export type AdminTab = 'roles' | 'menus' | 'knowledgeBases' | 'vendors' | 'models' | 'dictionaries';
+export type AdminTab = 'roles' | 'menus' | 'knowledgeBases' | 'vendors' | 'models' | 'dictionaries' | 'tools' | 'stations' | 'monitorData';
 
 export const adminTabPaths: Record<AdminTab, string> = {
   roles: '/admin/roles',
@@ -6,7 +6,10 @@ export const adminTabPaths: Record<AdminTab, string> = {
   knowledgeBases: '/admin/knowledge-bases',
   vendors: '/admin/vendors',
   models: '/admin/models',
-  dictionaries: '/admin/dictionaries'
+  dictionaries: '/admin/dictionaries',
+  tools: '/admin/tools',
+  stations: '/business/stations',
+  monitorData: '/business/monitor-data'
 };
 
 export const adminTabMeta: Record<
@@ -46,6 +49,21 @@ export const adminTabMeta: Record<
     label: '业务字典',
     title: '业务字典',
     description: '集中维护状态、模型类型等通用字典项，供基础管理页面统一复用。'
+  },
+  tools: {
+    label: '工具管理',
+    title: '工具管理',
+    description: '维护工具注册、参数 schema、权限角色、向量状态和检索统计，支持在线试搜索调试。'
+  },
+  stations: {
+    label: '站点管理',
+    title: '站点管理',
+    description: '维护太湖水质监测点位的站点编码、MN 编号、经纬度与站点类型。'
+  },
+  monitorData: {
+    label: '监测数据',
+    title: '监测数据',
+    description: '维护站点监测参数数据，并支持按时间点和浓度范围批量模拟生成一组监测值。'
   }
 };
 
@@ -64,6 +82,15 @@ export function resolveAdminTab(pathname: string): AdminTab {
   }
   if (pathname.startsWith('/admin/dictionaries')) {
     return 'dictionaries';
+  }
+  if (pathname.startsWith('/admin/tools')) {
+    return 'tools';
+  }
+  if (pathname.startsWith('/business/stations')) {
+    return 'stations';
+  }
+  if (pathname.startsWith('/business/monitor-data')) {
+    return 'monitorData';
   }
   return 'roles';
 }

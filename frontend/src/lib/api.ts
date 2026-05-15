@@ -406,6 +406,66 @@ export type AdminModelRecord = {
   sortOrder: number;
 };
 
+export type AdminToolRecord = {
+  id: string;
+  name: string;
+  description: string;
+  parametersSchema: string;
+  toolGroup: string;
+  tags: string[];
+  version: string;
+  status: string;
+  embeddingStatus: string;
+  embeddingError: string;
+  hitCount: number;
+  callCount: number;
+  successCount: number;
+  successRate: number;
+  roleIds: string[];
+  roleCodes: string[];
+  roleNames: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ToolSearchResult = {
+  id: string;
+  name: string;
+  toolGroup: string;
+  description: string;
+  similarity: number;
+  embeddingStatus: string;
+  roleCodes: string[];
+  roleNames: string[];
+  tags: string[];
+};
+
+export type AdminStationRecord = {
+  id: string;
+  stationId: string;
+  mn: string;
+  lat: number;
+  lng: number;
+  mnName: string;
+  st: number;
+};
+
+export type AdminMonitorDataRecord = {
+  id: string;
+  mn: string;
+  paramCode: string;
+  paramName: string;
+  value: number;
+  dataTime: string;
+};
+
+export type MonitorParamTemplate = {
+  paramCode: string;
+  paramName: string;
+  minValue: number;
+  maxValue: number;
+};
+
 export type AdminUpsertPayload = Record<string, unknown>;
 
 export class ApiError extends Error {
@@ -440,7 +500,13 @@ export const apiRoutes = {
     knowledgeBases: '/api/v1/admin/knowledge-bases',
     vendors: '/api/v1/admin/vendors',
     models: '/api/v1/admin/models',
-    dictItems: '/api/v1/admin/dict-items'
+    dictItems: '/api/v1/admin/dict-items',
+    tools: '/api/v1/admin/tools',
+    toolSearch: '/api/v1/admin/tools/test-search',
+    stations: '/api/v1/admin/stations',
+    monitorData: '/api/v1/admin/monitor-data',
+    monitorDataParams: '/api/v1/admin/monitor-data/params',
+    monitorDataSimulate: '/api/v1/admin/monitor-data/simulate'
   },
   workspaces: {
     dashboard: '/api/v1/workspaces/dashboard',
@@ -1108,8 +1174,31 @@ export function fetchAdminModels() {
   return requestNormalized<AdminModelRecord[]>(apiRoutes.admin.models, normalizeAdminModelList);
 }
 
+export function fetchAdminTools() {
+  return requestNormalized<AdminToolRecord[]>(apiRoutes.admin.tools, normalizeAdminToolList);
+}
+
+export function fetchAdminStations() {
+  return requestNormalized<AdminStationRecord[]>(apiRoutes.admin.stations, normalizeAdminStationList);
+}
+
+export function fetchAdminMonitorData() {
+  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.admin.monitorData, normalizeAdminMonitorDataList);
+}
+
+export function fetchAdminMonitorDataParams() {
+  return requestNormalized<MonitorParamTemplate[]>(apiRoutes.admin.monitorDataParams, normalizeMonitorParamTemplateList);
+}
+
 export function createAdminModel(payload: AdminUpsertPayload) {
   return requestNormalized<AdminModelRecord>(apiRoutes.admin.models, normalizeAdminModel, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createAdminTool(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminToolRecord>(apiRoutes.admin.tools, normalizeAdminTool, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -1122,9 +1211,85 @@ export function updateAdminModel(id: string, payload: AdminUpsertPayload) {
   });
 }
 
+export function updateAdminTool(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminToolRecord>(adminResourcePath(apiRoutes.admin.tools, id), normalizeAdminTool, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
 export function deleteAdminModel(id: string) {
   return request<null>(adminResourcePath(apiRoutes.admin.models, id), {
     method: 'DELETE'
+  });
+}
+
+export function deleteAdminTool(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.tools, id), {
+    method: 'DELETE'
+  });
+}
+
+export function replaceAdminToolRoles(id: string, roleIds: string[]) {
+  return request<null>(`${adminResourcePath(apiRoutes.admin.tools, id)}/roles`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      roleIds
+    })
+  });
+}
+
+export function testAdminTools(payload: AdminUpsertPayload) {
+  return requestNormalized<ToolSearchResult[]>(apiRoutes.admin.toolSearch, normalizeToolSearchResultList, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createAdminStation(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminStationRecord>(apiRoutes.admin.stations, normalizeAdminStation, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminStation(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminStationRecord>(adminResourcePath(apiRoutes.admin.stations, id), normalizeAdminStation, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminStation(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.stations, id), {
+    method: 'DELETE'
+  });
+}
+
+export function createAdminMonitorData(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminMonitorDataRecord>(apiRoutes.admin.monitorData, normalizeAdminMonitorData, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateAdminMonitorData(id: string, payload: AdminUpsertPayload) {
+  return requestNormalized<AdminMonitorDataRecord>(adminResourcePath(apiRoutes.admin.monitorData, id), normalizeAdminMonitorData, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteAdminMonitorData(id: string) {
+  return request<null>(adminResourcePath(apiRoutes.admin.monitorData, id), {
+    method: 'DELETE'
+  });
+}
+
+export function simulateAdminMonitorData(payload: AdminUpsertPayload) {
+  return requestNormalized<AdminMonitorDataRecord[]>(apiRoutes.admin.monitorDataSimulate, normalizeAdminMonitorDataList, {
+    method: 'POST',
+    body: JSON.stringify(payload)
   });
 }
 
@@ -1635,6 +1800,100 @@ function normalizeAdminModel(value: unknown, index = 0): AdminModelRecord {
     status: pickString(record, ['status', 'state'], enabled ? 'ACTIVE' : 'DISABLED'),
     sortOrder: pickNumber(record, ['sortOrder', 'sort', 'order'], index)
   };
+}
+
+function normalizeAdminToolList(value: unknown): AdminToolRecord[] {
+  return normalizeAdminList(value, normalizeAdminTool);
+}
+
+function normalizeAdminTool(value: unknown, index = 0): AdminToolRecord {
+  const record = asRecord(value);
+  const enabled = pickBoolean(record, ['enabled'], true);
+  return {
+    id: pickString(record, ['id', 'toolId'], `tool-${index + 1}`),
+    name: pickString(record, ['name', 'toolName'], `工具${index + 1}`),
+    description: pickString(record, ['description', 'desc'], ''),
+    parametersSchema: pickString(record, ['parametersSchema', 'parameters_schema', 'parameterSchema'], ''),
+    toolGroup: pickString(record, ['toolGroup', 'groupName', 'group'], ''),
+    tags: pickStringArray(record, ['tags', 'tagList'], []),
+    version: pickString(record, ['version'], '1.0.0'),
+    status: pickString(record, ['status', 'state'], enabled ? 'ACTIVE' : 'DISABLED'),
+    embeddingStatus: pickString(record, ['embeddingStatus', 'embedding_status'], 'PENDING'),
+    embeddingError: pickString(record, ['embeddingError', 'embedding_error'], ''),
+    hitCount: pickNumber(record, ['hitCount', 'hit_count'], 0),
+    callCount: pickNumber(record, ['callCount', 'call_count'], 0),
+    successCount: pickNumber(record, ['successCount', 'success_count'], 0),
+    successRate: pickNumber(record, ['successRate'], 0),
+    roleIds: pickStringArray(record, ['roleIds', 'role_ids'], []),
+    roleCodes: pickStringArray(record, ['roleCodes', 'role_codes'], []),
+    roleNames: pickStringArray(record, ['roleNames', 'role_names'], []),
+    createdAt: formatDateLabel(pickValue(record, ['createdAt', 'created_at'])),
+    updatedAt: formatDateLabel(pickValue(record, ['updatedAt', 'updated_at']))
+  };
+}
+
+function normalizeAdminStationList(value: unknown): AdminStationRecord[] {
+  return normalizeAdminList(value, normalizeAdminStation);
+}
+
+function normalizeAdminStation(value: unknown, index = 0): AdminStationRecord {
+  const record = asRecord(value);
+  return {
+    id: pickString(record, ['id', 'stationPk'], `station-${index + 1}`),
+    stationId: pickString(record, ['stationId', 'station_id', 'code'], `STATION-${index + 1}`),
+    mn: pickString(record, ['mn', 'mnCode'], ''),
+    lat: pickNumber(record, ['lat', 'latitude'], 0),
+    lng: pickNumber(record, ['lng', 'longitude'], 0),
+    mnName: pickString(record, ['mnName', 'mn_name', 'name'], ''),
+    st: pickNumber(record, ['st', 'stationType'], 0)
+  };
+}
+
+function normalizeAdminMonitorDataList(value: unknown): AdminMonitorDataRecord[] {
+  return normalizeAdminList(value, normalizeAdminMonitorData);
+}
+
+function normalizeAdminMonitorData(value: unknown, index = 0): AdminMonitorDataRecord {
+  const record = asRecord(value);
+  return {
+    id: pickString(record, ['id'], `monitor-data-${index + 1}`),
+    mn: pickString(record, ['mn'], ''),
+    paramCode: pickString(record, ['paramCode', 'param_code'], ''),
+    paramName: pickString(record, ['paramName', 'param_name'], ''),
+    value: pickNumber(record, ['value', 'measureValue', 'measure_value'], 0),
+    dataTime: formatDateLabel(pickValue(record, ['dataTime', 'data_time']))
+  };
+}
+
+function normalizeMonitorParamTemplateList(value: unknown): MonitorParamTemplate[] {
+  return normalizeAdminList(value, normalizeMonitorParamTemplate);
+}
+
+function normalizeMonitorParamTemplate(value: unknown): MonitorParamTemplate {
+  const record = asRecord(value);
+  return {
+    paramCode: pickString(record, ['paramCode', 'param_code'], ''),
+    paramName: pickString(record, ['paramName', 'param_name'], ''),
+    minValue: pickNumber(record, ['minValue', 'min_value'], 0),
+    maxValue: pickNumber(record, ['maxValue', 'max_value'], 0)
+  };
+}
+
+function normalizeToolSearchResultList(value: unknown): ToolSearchResult[] {
+  return normalizeAdminList(value, (item, index) => {
+    const record = asRecord(item);
+    return {
+      id: pickString(record, ['id', 'toolId'], `tool-search-${index + 1}`),
+      name: pickString(record, ['name', 'toolName'], `工具${index + 1}`),
+      toolGroup: pickString(record, ['toolGroup', 'groupName', 'group'], ''),
+      description: pickString(record, ['description', 'desc'], ''),
+      similarity: pickNumber(record, ['similarity', 'score'], 0),
+      embeddingStatus: pickString(record, ['embeddingStatus', 'embedding_status'], ''),
+      roleCodes: pickStringArray(record, ['roleCodes', 'role_codes'], []),
+      roleNames: pickStringArray(record, ['roleNames', 'role_names'], []),
+      tags: pickStringArray(record, ['tags', 'tagList'], [])
+    } satisfies ToolSearchResult;
+  });
 }
 
 function normalizeAdminList<T>(value: unknown, normalize: (item: unknown, index: number) => T): T[] {

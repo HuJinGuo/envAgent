@@ -1,39 +1,60 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Database, Edit3, Eye, Layers, Plus, Settings, ShieldCheck, Trash2, X } from 'lucide-react';
+import { BarChart3, ChevronRight, Database, Edit3, Eye, Layers, Plus, Search, Settings, ShieldCheck, Trash2, WandSparkles, Wrench, X } from 'lucide-react';
 import {
+  createAdminMonitorData,
   createAdminDictItem,
   createAdminKnowledgeBase,
   createAdminMenu,
   createAdminModel,
+  createAdminTool,
   createAdminRole,
+  createAdminStation,
   createAdminVendor,
+  deleteAdminMonitorData,
   deleteAdminDictItem,
   deleteAdminKnowledgeBase,
   deleteAdminMenu,
   deleteAdminModel,
+  deleteAdminTool,
   deleteAdminRole,
+  deleteAdminStation,
   deleteAdminVendor,
   fetchAdminDictItems,
   fetchAdminKnowledgeBases,
   fetchAdminMenus,
+  fetchAdminMonitorData,
+  fetchAdminMonitorDataParams,
   fetchAdminModels,
+  fetchAdminTools,
   fetchAdminRoles,
+  fetchAdminStations,
   fetchAdminVendors,
   replaceAdminRoleMenus,
+  replaceAdminToolRoles,
+  simulateAdminMonitorData,
+  testAdminTools,
+  updateAdminMonitorData,
   updateAdminDictItem,
   updateAdminKnowledgeBase,
   updateAdminMenu,
   updateAdminModel,
+  updateAdminTool,
   updateAdminRole,
+  updateAdminStation,
   updateAdminVendor,
   type AdminDictionaryRecord,
   type AdminKnowledgeBaseRecord,
   type AdminMenuRecord,
+  type AdminMonitorDataRecord,
   type AdminModelRecord,
+  type AdminToolRecord,
+  type MonitorParamTemplate,
   type AdminRoleRecord,
+  type AdminStationRecord,
   type AdminUpsertPayload,
-  type AdminVendorRecord
+  type AdminVendorRecord,
+  type ToolSearchResult
 } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Badge } from '../components/ui/badge';
@@ -46,6 +67,7 @@ import { fallbackWorkspaceRoutes } from '../lib/workspace-routes';
 import { getErrorMessage, PageSkeleton } from './shared';
 
 const PAGE_SIZE = 10;
+const ALL_STATIONS_VALUE = 'ALL';
 
 type AdminRecord =
   | AdminRoleRecord
@@ -53,13 +75,16 @@ type AdminRecord =
   | AdminDictionaryRecord
   | AdminKnowledgeBaseRecord
   | AdminVendorRecord
-  | AdminModelRecord;
+  | AdminModelRecord
+  | AdminToolRecord
+  | AdminStationRecord
+  | AdminMonitorDataRecord;
 
 type FieldConfig = {
   key: string;
   label: string;
   placeholder?: string;
-  type?: 'text' | 'password';
+  type?: 'text' | 'password' | 'datetime-local' | 'textarea';
   helpText?: string;
   span?: 1 | 2;
 };
@@ -74,10 +99,79 @@ type RoleMenuState = {
   selectedMenuIds: string[];
 } | null;
 
+type ToolRoleState = {
+  tool: AdminToolRecord;
+  selectedRoleIds: string[];
+} | null;
+
+type SimulateRangeValue = {
+  paramCode: string;
+  paramName: string;
+  minValue: string;
+  maxValue: string;
+};
+
+type SimulateModalState = {
+  mn: string;
+  dataTime: string;
+  ranges: SimulateRangeValue[];
+} | null;
+
+type MonitorDataGroupRow = {
+  id: string;
+  mn: string;
+  mnName: string;
+  dataTime: string;
+  detailIds: Partial<Record<MonitorParamCode, string>>;
+  totalPhosphorus: string;
+  totalNitrogen: string;
+  ammoniaNitrogen: string;
+  codmn: string;
+  ph: string;
+  waterLevel: string;
+  flow: string;
+  velocity: string;
+};
+
+type MonitorParamCode = 'TP' | 'TN' | 'NH3N' | 'CODMN' | 'PH' | 'WL' | 'Q' | 'VS';
+
+type MonitorGroupField = {
+  paramCode: MonitorParamCode;
+  paramName: string;
+  value: string;
+  recordId?: string;
+};
+
+type MonitorDataGroupModalState = {
+  id: string;
+  mn: string;
+  mnName: string;
+  dataTime: string;
+  fields: MonitorGroupField[];
+} | null;
+
+type ToolSearchState = {
+  query: string;
+  roleCode: string;
+  groupName: string;
+  results: ToolSearchResult[];
+} | null;
+
 type SelectOption = {
   label: string;
   value: string;
 };
+
+const MONITOR_PARAM_META: Array<{ code: MonitorParamCode; name: string }> = [
+  { code: 'TP', name: '总磷' },
+  { code: 'TN', name: '总氮' },
+  { code: 'NH3N', name: '氨氮' },
+  { code: 'CODMN', name: '高猛' },
+  { code: 'PH', name: 'ph' },
+  { code: 'WL', name: '水位' },
+  { code: 'Q', name: '流量' },
+  { code: 'VS', name: '流速' }
+];
 
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof ShieldCheck }> = [
   { id: 'roles', label: '角色管理', icon: ShieldCheck },
@@ -85,7 +179,10 @@ const tabs: Array<{ id: AdminTab; label: string; icon: typeof ShieldCheck }> = [
   { id: 'knowledgeBases', label: '知识库管理', icon: Database },
   { id: 'vendors', label: '厂商管理', icon: Settings },
   { id: 'models', label: '模型管理', icon: Settings },
-  { id: 'dictionaries', label: '业务字典', icon: Settings }
+  { id: 'dictionaries', label: '业务字典', icon: Settings },
+  { id: 'tools', label: '工具管理', icon: Wrench },
+  { id: 'stations', label: '站点管理', icon: Database },
+  { id: 'monitorData', label: '监测数据', icon: Database }
 ];
 
 const fields: Record<AdminTab, FieldConfig[]> = {
@@ -139,6 +236,30 @@ const fields: Record<AdminTab, FieldConfig[]> = {
     { key: 'description', label: '描述', span: 2 },
     { key: 'status', label: '状态' },
     { key: 'sortOrder', label: '排序' }
+  ],
+  tools: [
+    { key: 'name', label: '工具名', placeholder: 'weather_lookup' },
+    { key: 'toolGroup', label: '所属分组', placeholder: 'environment' },
+    { key: 'version', label: '版本号', placeholder: '1.0.0' },
+    { key: 'status', label: '状态' },
+    { key: 'tags', label: '标签', placeholder: '天气,气象,出行', span: 2 },
+    { key: 'description', label: '描述', type: 'textarea', placeholder: '说明工具的适用场景、输入输出和边界。', span: 2 },
+    { key: 'parametersSchema', label: '参数 Schema', type: 'textarea', placeholder: '{ \"type\": \"object\" }', span: 2 }
+  ],
+  stations: [
+    { key: 'stationId', label: '站点编码', placeholder: 'TH-WX-001' },
+    { key: 'mn', label: 'MN 编号', placeholder: '320200A001' },
+    { key: 'mnName', label: '点位名称', placeholder: '太湖梅梁湖心', span: 2 },
+    { key: 'lat', label: '纬度', placeholder: '31.4382' },
+    { key: 'lng', label: '经度', placeholder: '120.2096' },
+    { key: 'st', label: '站点类型', placeholder: '21' }
+  ],
+  monitorData: [
+    { key: 'mn', label: 'MN 编号', placeholder: '320200A001' },
+    { key: 'paramCode', label: '参数编码', placeholder: 'TN' },
+    { key: 'paramName', label: '参数名称', placeholder: '总氮' },
+    { key: 'value', label: '监测值', placeholder: '1.568' },
+    { key: 'dataTime', label: '监测时间', placeholder: '2026-05-15T08:00', type: 'datetime-local', span: 2 }
   ]
 };
 
@@ -151,11 +272,18 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
     knowledgeBases: 1,
     vendors: 1,
     models: 1,
-    dictionaries: 1
+    dictionaries: 1,
+    tools: 1,
+    stations: 1,
+    monitorData: 1
   });
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [modalState, setModalState] = useState<ModalState>(null);
   const [roleMenuState, setRoleMenuState] = useState<RoleMenuState>(null);
+  const [toolRoleState, setToolRoleState] = useState<ToolRoleState>(null);
+  const [simulateModalState, setSimulateModalState] = useState<SimulateModalState>(null);
+  const [monitorGroupModalState, setMonitorGroupModalState] = useState<MonitorDataGroupModalState>(null);
+  const [toolSearchState, setToolSearchState] = useState<ToolSearchState>(null);
   const [expandedMenuIds, setExpandedMenuIds] = useState<string[]>([]);
 
   const rolesQuery = useQuery({
@@ -182,11 +310,35 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
     queryKey: ['admin-management', 'models'],
     queryFn: fetchAdminModels
   });
+  const toolsQuery = useQuery({
+    queryKey: ['admin-management', 'tools'],
+    queryFn: fetchAdminTools
+  });
+  const stationsQuery = useQuery({
+    queryKey: ['admin-management', 'stations'],
+    queryFn: fetchAdminStations
+  });
+  const monitorDataQuery = useQuery({
+    queryKey: ['admin-management', 'monitor-data'],
+    queryFn: fetchAdminMonitorData
+  });
+  const monitorDataParamsQuery = useQuery({
+    queryKey: ['admin-management', 'monitor-data-params'],
+    queryFn: fetchAdminMonitorDataParams
+  });
 
   const menuTree = menusQuery.data?.data ?? [];
   const flattenedMenus = useMemo(() => flattenMenuTree(menuTree), [menuTree]);
   const dictItems = dictItemsQuery.data?.data ?? [];
   const vendors = vendorsQuery.data?.data ?? [];
+  const stationNameByMn = useMemo(
+    () => new Map((stationsQuery.data?.data ?? []).map((item) => [item.mn, item.mnName])),
+    [stationsQuery.data]
+  );
+  const monitorDataGroups = useMemo(
+    () => groupMonitorDataRows(monitorDataQuery.data?.data ?? [], stationNameByMn),
+    [monitorDataQuery.data, stationNameByMn]
+  );
   const recordsByTab = useMemo<Record<AdminTab, AdminRecord[]>>(
     () => ({
       roles: rolesQuery.data?.data ?? [],
@@ -194,14 +346,22 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
       knowledgeBases: knowledgeBasesQuery.data?.data ?? [],
       vendors,
       models: modelsQuery.data?.data ?? [],
-      dictionaries: dictItems
+      tools: toolsQuery.data?.data ?? [],
+      dictionaries: dictItems,
+      stations: stationsQuery.data?.data ?? [],
+      monitorData: monitorDataQuery.data?.data ?? []
     }),
-    [dictItems, flattenedMenus, knowledgeBasesQuery.data, modelsQuery.data, rolesQuery.data, vendors]
+    [dictItems, flattenedMenus, knowledgeBasesQuery.data, modelsQuery.data, monitorDataQuery.data, rolesQuery.data, stationsQuery.data, toolsQuery.data, vendors]
   );
 
   const activeRecords = recordsByTab[activeTab];
   const currentPage = pageByTab[activeTab];
-  const totalPages = Math.max(1, Math.ceil(activeRecords.length / PAGE_SIZE));
+  const monitorDataPagedGroups = useMemo(
+    () => monitorDataGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, monitorDataGroups]
+  );
+  const totalRecords = activeTab === 'monitorData' ? monitorDataGroups.length : activeRecords.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
   const pagedRecords = useMemo(
     () => activeRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
     [activeRecords, currentPage]
@@ -234,15 +394,50 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
     knowledgeBasesQuery.isLoading ||
     vendorsQuery.isLoading ||
     dictItemsQuery.isLoading ||
-    modelsQuery.isLoading;
+    modelsQuery.isLoading ||
+    toolsQuery.isLoading ||
+    stationsQuery.isLoading ||
+    monitorDataQuery.isLoading ||
+    monitorDataParamsQuery.isLoading;
   const firstError =
-    rolesQuery.error ?? menusQuery.error ?? knowledgeBasesQuery.error ?? vendorsQuery.error ?? dictItemsQuery.error ?? modelsQuery.error;
+    rolesQuery.error ??
+    menusQuery.error ??
+    knowledgeBasesQuery.error ??
+    vendorsQuery.error ??
+    dictItemsQuery.error ??
+    modelsQuery.error ??
+    toolsQuery.error ??
+    stationsQuery.error ??
+    monitorDataQuery.error ??
+    monitorDataParamsQuery.error;
 
   const statusOptions = useMemo(() => buildDictOptions(dictItems, 'COMMON_STATUS'), [dictItems]);
   const modelTypeOptions = useMemo(() => buildDictOptions(dictItems, 'MODEL_TYPE'), [dictItems]);
+  const stationMnOptions = useMemo<SelectOption[]>(
+    () => [
+      { label: '全部站点', value: ALL_STATIONS_VALUE },
+      ...(stationsQuery.data?.data ?? []).map((item) => ({ label: `${item.mnName} (${item.mn})`, value: item.mn }))
+    ],
+    [stationsQuery.data]
+  );
   const vendorOptions = useMemo<SelectOption[]>(
     () => vendors.map((item) => ({ label: `${item.name} (${item.code})`, value: item.id })),
     [vendors]
+  );
+  const roleOptions = useMemo<SelectOption[]>(
+    () => (rolesQuery.data?.data ?? []).map((item) => ({ label: `${item.name} (${item.code})`, value: item.id })),
+    [rolesQuery.data]
+  );
+  const roleCodeOptions = useMemo<SelectOption[]>(
+    () => (rolesQuery.data?.data ?? []).map((item) => ({ label: `${item.name} (${item.code})`, value: item.code })),
+    [rolesQuery.data]
+  );
+  const toolGroupOptions = useMemo<SelectOption[]>(
+    () =>
+      Array.from(new Set((toolsQuery.data?.data ?? []).map((item) => item.toolGroup)))
+        .filter(Boolean)
+        .map((item) => ({ label: item, value: item })),
+    [toolsQuery.data]
   );
   const dictTypeOptions = useMemo<SelectOption[]>(
     () =>
@@ -294,6 +489,65 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
     }
   });
 
+  const toolRoleMutation = useMutation({
+    mutationFn: ({ id, roleIds }: { id: string; roleIds: string[] }) => replaceAdminToolRoles(id, roleIds),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-management', 'tools'] });
+      setToolRoleState(null);
+    }
+  });
+
+  const toolSearchMutation = useMutation({
+    mutationFn: (payload: AdminUpsertPayload) => testAdminTools(payload),
+    onSuccess: (response) => {
+      setToolSearchState((current) => (current ? { ...current, results: response.data } : current));
+    }
+  });
+
+  const simulateMutation = useMutation({
+    mutationFn: (payload: AdminUpsertPayload) => simulateAdminMonitorData(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-management', 'monitor-data'] });
+      setSimulateModalState(null);
+    }
+  });
+
+  const monitorGroupSaveMutation = useMutation({
+    mutationFn: async (payload: MonitorDataGroupModalState) => {
+      if (!payload) {
+        return null;
+      }
+      await Promise.all(
+        payload.fields.map((field) => {
+          const requestPayload = {
+            mn: payload.mn,
+            paramCode: field.paramCode,
+            paramName: field.paramName,
+            value: parseNullableNumber(field.value),
+            dataTime: normalizeDateTimeText(payload.dataTime)
+          };
+          return field.recordId ? updateAdminMonitorData(field.recordId, requestPayload) : createAdminMonitorData(requestPayload);
+        })
+      );
+      return null;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-management', 'monitor-data'] });
+      setMonitorGroupModalState(null);
+    }
+  });
+
+  const monitorGroupDeleteMutation = useMutation({
+    mutationFn: async (record: MonitorDataGroupRow) => {
+      const ids = Object.values(record.detailIds).filter(Boolean) as string[];
+      await Promise.all(ids.map((id) => deleteAdminMonitorData(id)));
+      return null;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-management', 'monitor-data'] });
+    }
+  });
+
   if (isLoading) {
     return <PageSkeleton blocks={5} />;
   }
@@ -310,10 +564,52 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
         title={meta.title}
         description={meta.description}
         action={
-          <Button size="sm" onClick={() => setModalState({ mode: 'create', tab: activeTab })}>
-            <Plus className="h-4 w-4" />
-            新增
-          </Button>
+          <div className="flex gap-2">
+            {activeTab === 'monitorData' ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  setSimulateModalState({
+                    mn: stationMnOptions[0]?.value ?? ALL_STATIONS_VALUE,
+                    dataTime: formatDateTimeInput(new Date()),
+                    ranges: (monitorDataParamsQuery.data?.data ?? []).map((item) => ({
+                      paramCode: item.paramCode,
+                      paramName: item.paramName,
+                      minValue: String(item.minValue),
+                      maxValue: String(item.maxValue)
+                    }))
+                  })
+                }
+              >
+                <WandSparkles className="h-4 w-4" />
+                模拟数据
+              </Button>
+            ) : null}
+            {activeTab === 'tools' ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  setToolSearchState({
+                    query: '',
+                    roleCode: '',
+                    groupName: '',
+                    results: []
+                  })
+                }
+              >
+                <Search className="h-4 w-4" />
+                试搜索
+              </Button>
+            ) : null}
+            {activeTab !== 'monitorData' ? (
+              <Button size="sm" onClick={() => setModalState({ mode: 'create', tab: activeTab })}>
+                <Plus className="h-4 w-4" />
+                新增
+              </Button>
+            ) : null}
+          </div>
         }
       >
         <div className="workspace-table">
@@ -349,6 +645,22 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
                   </tr>
                 )}
               </tbody>
+                ) : activeTab === 'monitorData' ? (
+              <tbody>
+                {monitorDataPagedGroups.map((record) =>
+                  renderMonitorDataGroupRow(record, {
+                    onEdit: () => setMonitorGroupModalState(buildMonitorGroupModalState(record)),
+                    onDelete: () => monitorGroupDeleteMutation.mutate(record)
+                  }, monitorGroupDeleteMutation.isPending)
+                )}
+                {!monitorDataPagedGroups.length ? (
+                  <tr>
+                    <td colSpan={12} className="px-4 py-8 text-center text-sm text-[#94a3b8]">
+                      暂无数据。
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
             ) : (
               <tbody>
                 {pagedRecords.map((record) =>
@@ -367,6 +679,12 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
                             selectedMenuIds: [...record.menuIds]
                           });
                         }
+                        if ('roleIds' in record && activeTab === 'tools') {
+                          setToolRoleState({
+                            tool: record,
+                            selectedRoleIds: [...record.roleIds]
+                          });
+                        }
                       }
                     },
                     deleteMutation.isPending
@@ -375,7 +693,7 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
                 {!pagedRecords.length ? (
                   <tr>
                     <td
-                      colSpan={activeTab === 'roles' || activeTab === 'vendors' || activeTab === 'models' ? 7 : 6}
+                      colSpan={activeTab === 'roles' || activeTab === 'vendors' || activeTab === 'models' || activeTab === 'tools' || activeTab === 'stations' ? 7 : 6}
                       className="px-4 py-8 text-center text-sm text-[#94a3b8]"
                     >
                       暂无数据。
@@ -390,7 +708,7 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
         {activeTab === 'menus' ? null : (
           <PaginationFooter
             page={currentPage}
-            total={activeRecords.length}
+            total={totalRecords}
             totalPages={totalPages}
             onPrev={() => setPageByTab((current) => ({ ...current, [activeTab]: Math.max(1, current[activeTab] - 1) }))}
             onNext={() => setPageByTab((current) => ({ ...current, [activeTab]: Math.min(totalPages, current[activeTab] + 1) }))}
@@ -431,7 +749,8 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
             statusOptions,
             modelTypeOptions,
             vendorOptions,
-            dictTypeOptions
+            dictTypeOptions,
+            stationMnOptions
           })}
           savePending={saveMutation.isPending}
           error={saveMutation.error}
@@ -462,6 +781,83 @@ export function AdminPage(props: { activeTab?: AdminTab } = {}) {
           }
           onClose={() => setRoleMenuState(null)}
           onSubmit={() => roleMenuMutation.mutate({ id: roleMenuState.role.id, menuIds: roleMenuState.selectedMenuIds })}
+        />
+      ) : null}
+
+      {toolRoleState ? (
+        <ToolRolesModal
+          tool={toolRoleState.tool}
+          roleOptions={roleOptions}
+          selectedRoleIds={toolRoleState.selectedRoleIds}
+          savePending={toolRoleMutation.isPending}
+          error={toolRoleMutation.error}
+          onToggle={(roleId) =>
+            setToolRoleState((current) =>
+              current
+                ? {
+                    ...current,
+                    selectedRoleIds: current.selectedRoleIds.includes(roleId)
+                      ? current.selectedRoleIds.filter((item) => item !== roleId)
+                      : [...current.selectedRoleIds, roleId]
+                  }
+                : current
+            )
+          }
+          onClose={() => setToolRoleState(null)}
+          onSubmit={() => toolRoleMutation.mutate({ id: toolRoleState.tool.id, roleIds: toolRoleState.selectedRoleIds })}
+        />
+      ) : null}
+
+      {simulateModalState ? (
+        <MonitorDataSimulateModal
+          values={simulateModalState}
+          stationOptions={stationMnOptions}
+          savePending={simulateMutation.isPending}
+          error={simulateMutation.error}
+          onClose={() => setSimulateModalState(null)}
+          onChange={(next) => setSimulateModalState(next)}
+          onSubmit={() =>
+            simulateMutation.mutate({
+              mn: simulateModalState.mn,
+              dataTime: normalizeDateTimeText(simulateModalState.dataTime),
+              ranges: simulateModalState.ranges.map((item) => ({
+                paramCode: item.paramCode,
+                paramName: item.paramName,
+                minValue: parseNullableNumber(item.minValue),
+                maxValue: parseNullableNumber(item.maxValue)
+              }))
+            })
+          }
+        />
+      ) : null}
+
+      {monitorGroupModalState ? (
+        <MonitorDataGroupEditModal
+          values={monitorGroupModalState}
+          savePending={monitorGroupSaveMutation.isPending}
+          error={monitorGroupSaveMutation.error}
+          onClose={() => setMonitorGroupModalState(null)}
+          onChange={(next) => setMonitorGroupModalState(next)}
+          onSubmit={() => monitorGroupSaveMutation.mutate(monitorGroupModalState)}
+        />
+      ) : null}
+
+      {toolSearchState ? (
+        <ToolSearchModal
+          values={toolSearchState}
+          roleCodeOptions={roleCodeOptions}
+          groupOptions={toolGroupOptions}
+          searchPending={toolSearchMutation.isPending}
+          error={toolSearchMutation.error}
+          onClose={() => setToolSearchState(null)}
+          onChange={(next) => setToolSearchState(next)}
+          onSubmit={() =>
+            toolSearchMutation.mutate({
+              query: toolSearchState.query.trim(),
+              roleCode: toolSearchState.roleCode || null,
+              groupName: toolSearchState.groupName || null
+            })
+          }
         />
       ) : null}
     </>
@@ -532,6 +928,52 @@ function renderTableHead(tab: AdminTab) {
         <th className="px-4 py-3">字典值</th>
         <th className="px-4 py-3">状态</th>
         <th className="px-4 py-3">排序</th>
+        <th className="px-4 py-3 text-right">操作</th>
+      </tr>
+    );
+  }
+
+  if (tab === 'stations') {
+    return (
+      <tr>
+        <th className="px-4 py-3">点位名称</th>
+        <th className="px-4 py-3">站点编码</th>
+        <th className="px-4 py-3">MN 编号</th>
+        <th className="px-4 py-3">经纬度</th>
+        <th className="px-4 py-3">ST</th>
+        <th className="px-4 py-3 text-right">操作</th>
+      </tr>
+    );
+  }
+
+  if (tab === 'tools') {
+    return (
+      <tr>
+        <th className="px-4 py-3">工具名</th>
+        <th className="px-4 py-3">分组</th>
+        <th className="px-4 py-3">状态</th>
+        <th className="px-4 py-3">向量状态</th>
+        <th className="px-4 py-3">权限角色</th>
+        <th className="px-4 py-3">统计</th>
+        <th className="px-4 py-3 text-right">操作</th>
+      </tr>
+    );
+  }
+
+  if (tab === 'monitorData') {
+    return (
+      <tr>
+        <th className="px-4 py-3">站点名称</th>
+        <th className="px-4 py-3">MN 编号</th>
+        <th className="px-4 py-3">监测时间</th>
+        <th className="px-4 py-3">总磷</th>
+        <th className="px-4 py-3">总氮</th>
+        <th className="px-4 py-3">氨氮</th>
+        <th className="px-4 py-3">高猛</th>
+        <th className="px-4 py-3">ph</th>
+        <th className="px-4 py-3">水位</th>
+        <th className="px-4 py-3">流量</th>
+        <th className="px-4 py-3">流速</th>
         <th className="px-4 py-3 text-right">操作</th>
       </tr>
     );
@@ -738,6 +1180,76 @@ function renderTableRow(
     );
   }
 
+  if (tab === 'stations') {
+    const item = record as AdminStationRecord;
+    return (
+      <tr key={item.id}>
+        <td className="px-4 py-3 font-medium text-[#334155]">{item.mnName}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.stationId}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.mn}</td>
+        <td className="px-4 py-3 text-[#64748b]">
+          {item.lat}, {item.lng}
+        </td>
+        <td className="px-4 py-3 text-[#64748b]">{item.st}</td>
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-2">
+            <ActionButtons handlers={handlers} deletePending={deletePending} />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  if (tab === 'tools') {
+    const item = record as AdminToolRecord;
+    return (
+      <tr key={item.id}>
+        <td className="px-4 py-3">
+          <div className="font-medium text-[#334155]">{item.name}</div>
+          <div className="mt-1 text-xs text-[#94a3b8]">{item.version || '--'}</div>
+        </td>
+        <td className="px-4 py-3 text-[#64748b]">{item.toolGroup || '--'}</td>
+        <td className="px-4 py-3">
+          <Badge tone={item.status === 'ACTIVE' ? 'good' : 'warn'}>{item.status}</Badge>
+        </td>
+        <td className="px-4 py-3">
+          <Badge tone={resolveEmbeddingTone(item.embeddingStatus)}>{item.embeddingStatus || '--'}</Badge>
+        </td>
+        <td className="max-w-[220px] px-4 py-3 text-[#64748b]">{item.roleNames.length ? item.roleNames.join('、') : '未绑定'}</td>
+        <td className="px-4 py-3 text-[#64748b]">
+          <div className="space-y-1">
+            <div>命中 {item.hitCount}</div>
+            <div>调用 {item.callCount}</div>
+            <div>成功率 {formatPercent(item.successRate)}</div>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-2">
+            <ActionButtons handlers={handlers} deletePending={deletePending} includeRoleMenus roleActionLabel="角色权限" />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  if (tab === 'monitorData') {
+    const item = record as AdminMonitorDataRecord;
+    return (
+      <tr key={item.id}>
+        <td className="px-4 py-3 text-[#334155]">{item.mn}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.paramCode}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.paramName}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.value}</td>
+        <td className="px-4 py-3 text-[#64748b]">{item.dataTime}</td>
+        <td className="px-4 py-3">
+          <div className="flex justify-end gap-2">
+            <ActionButtons handlers={handlers} deletePending={deletePending} />
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   const item = record as AdminModelRecord;
   return (
     <tr key={item.id}>
@@ -758,6 +1270,43 @@ function renderTableRow(
   );
 }
 
+function renderMonitorDataGroupRow(
+  record: MonitorDataGroupRow,
+  handlers: {
+    onEdit: () => void;
+    onDelete: () => void;
+  },
+  deletePending: boolean
+) {
+  return (
+    <tr key={record.id}>
+      <td className="px-4 py-3 font-medium text-[#334155]">{record.mnName}</td>
+      <td className="px-4 py-3 font-medium text-[#334155]">{record.mn}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.dataTime}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.totalPhosphorus}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.totalNitrogen}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.ammoniaNitrogen}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.codmn}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.ph}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.waterLevel}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.flow}</td>
+      <td className="px-4 py-3 text-[#64748b]">{record.velocity}</td>
+      <td className="px-4 py-3">
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={handlers.onEdit}>
+            <Edit3 className="h-4 w-4" />
+            修改
+          </Button>
+          <Button size="sm" variant="ghost" disabled={deletePending} onClick={handlers.onDelete}>
+            <Trash2 className="h-4 w-4" />
+            删除
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function ActionButtons(props: {
   handlers: {
     onDetail: () => void;
@@ -767,6 +1316,7 @@ function ActionButtons(props: {
   };
   deletePending: boolean;
   includeRoleMenus?: boolean;
+  roleActionLabel?: string;
 }) {
   return (
     <>
@@ -781,7 +1331,7 @@ function ActionButtons(props: {
       {props.includeRoleMenus ? (
         <Button size="sm" variant="ghost" onClick={props.handlers.onRoleMenus}>
           <ShieldCheck className="h-4 w-4" />
-          菜单权限
+          {props.roleActionLabel ?? '菜单权限'}
         </Button>
       ) : null}
       <Button size="sm" variant="ghost" disabled={props.deletePending} onClick={props.handlers.onDelete}>
@@ -841,12 +1391,22 @@ function RecordFormModal(props: {
                   ))}
                 </select>
               ) : (
-                <Input
-                  type={field.type ?? 'text'}
-                  value={props.values[field.key] ?? ''}
-                  onChange={(event) => props.onChange(field.key, event.target.value)}
-                  placeholder={field.placeholder}
-                />
+                field.type === 'textarea' ? (
+                  <textarea
+                    value={props.values[field.key] ?? ''}
+                    onChange={(event) => props.onChange(field.key, event.target.value)}
+                    placeholder={field.placeholder}
+                    rows={field.key === 'parametersSchema' ? 10 : 4}
+                    className="w-full rounded border border-[#dcdfe6] bg-white px-3 py-2 text-sm leading-6 text-[#303133] outline-none transition duration-150 focus:border-[#409eff] focus:shadow-[0_0_0_2px_rgba(64,158,255,0.12)]"
+                  />
+                ) : (
+                  <Input
+                    type={field.type ?? 'text'}
+                    value={props.values[field.key] ?? ''}
+                    onChange={(event) => props.onChange(field.key, event.target.value)}
+                    placeholder={field.placeholder}
+                  />
+                )
               )}
               {field.helpText ? (
                 <span className="block text-xs leading-5 text-[#909399]">
@@ -1050,6 +1610,202 @@ function RecordDetailModal(props: {
   );
 }
 
+function MonitorDataSimulateModal(props: {
+  values: SimulateModalState;
+  stationOptions: SelectOption[];
+  savePending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onChange: (next: SimulateModalState) => void;
+  onSubmit: () => void;
+}) {
+  if (!props.values) {
+    return null;
+  }
+  const values = props.values;
+
+  const updateRange = (index: number, key: 'minValue' | 'maxValue', value: string) => {
+    props.onChange({
+      ...values,
+      ranges: values.ranges.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item))
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/40 px-4 py-6 backdrop-blur-[2px]">
+      <div className="w-full max-w-[880px] rounded border border-[#dcdfe6] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]">
+        <div className="flex items-start justify-between border-b border-[#ebeef5] px-5 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#303133]">模拟监测数据</h3>
+            <p className="mt-1 text-sm text-[#909399]">选择站点 MN、监测时间和各参数浓度范围，一次生成该时刻的一组监测数据。</p>
+          </div>
+          <button
+            type="button"
+            className="rounded border border-transparent p-2 text-[#909399] transition hover:border-[#dcdfe6] hover:bg-[#f5f7fa] hover:text-[#409eff]"
+            onClick={props.onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid gap-4 border-b border-[#ebeef5] px-5 py-5 sm:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-xs text-[#606266]">绑定站点 MN</span>
+            <select
+              value={values.mn}
+              onChange={(event) => props.onChange({ ...values, mn: event.target.value })}
+              className="h-10 w-full rounded border border-[#dcdfe6] bg-white px-3 text-sm text-[#303133] outline-none transition duration-150 focus:border-[#409eff] focus:shadow-[0_0_0_2px_rgba(64,158,255,0.12)]"
+            >
+              <option value="">请选择站点</option>
+              {props.stationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs text-[#606266]">监测时间点</span>
+            <Input
+              type="datetime-local"
+              value={values.dataTime}
+              onChange={(event) => props.onChange({ ...values, dataTime: event.target.value })}
+            />
+          </label>
+        </div>
+
+        <div className="max-h-[52vh] overflow-y-auto px-5 py-5">
+          <div className="workspace-table">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3">参数编码</th>
+                  <th className="px-4 py-3">参数名称</th>
+                  <th className="px-4 py-3">最小值</th>
+                  <th className="px-4 py-3">最大值</th>
+                </tr>
+              </thead>
+              <tbody>
+                {values.ranges.map((item, index) => (
+                  <tr key={item.paramCode}>
+                    <td className="px-4 py-3 text-[#334155]">{item.paramCode}</td>
+                    <td className="px-4 py-3 text-[#334155]">{item.paramName}</td>
+                    <td className="px-4 py-3">
+                      <Input value={item.minValue} onChange={(event) => updateRange(index, 'minValue', event.target.value)} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Input value={item.maxValue} onChange={(event) => updateRange(index, 'maxValue', event.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {props.error ? (
+          <div className="mx-5 rounded border border-[#f3d19e] bg-[#fdf6ec] px-3 py-2 text-sm text-[#a66a00]">
+            {getErrorMessage(props.error)}
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2 border-t border-[#ebeef5] px-5 py-4">
+          <Button variant="secondary" onClick={props.onClose}>
+            取消
+          </Button>
+          <Button onClick={props.onSubmit} disabled={props.savePending}>
+            {props.savePending ? '生成中...' : '生成数据'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonitorDataGroupEditModal(props: {
+  values: MonitorDataGroupModalState;
+  savePending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onChange: (next: MonitorDataGroupModalState) => void;
+  onSubmit: () => void;
+}) {
+  if (!props.values) {
+    return null;
+  }
+  const values = props.values;
+
+  const updateField = (paramCode: MonitorParamCode, value: string) => {
+    props.onChange({
+      ...values,
+      fields: values.fields.map((field) => (field.paramCode === paramCode ? { ...field, value } : field))
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/40 px-4 py-6 backdrop-blur-[2px]">
+      <div className="w-full max-w-[820px] rounded border border-[#dcdfe6] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]">
+        <div className="flex items-start justify-between border-b border-[#ebeef5] px-5 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#303133]">修改监测数据</h3>
+            <p className="mt-1 text-sm text-[#909399]">
+              {values.mnName}（{values.mn}）在 {values.dataTime} 的监测数据组。
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded border border-transparent p-2 text-[#909399] transition hover:border-[#dcdfe6] hover:bg-[#f5f7fa] hover:text-[#409eff]"
+            onClick={props.onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[52vh] overflow-y-auto px-5 py-5">
+          <div className="workspace-table">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3">参数编码</th>
+                  <th className="px-4 py-3">参数名称</th>
+                  <th className="px-4 py-3">监测值</th>
+                </tr>
+              </thead>
+              <tbody>
+                {values.fields.map((field) => (
+                  <tr key={field.paramCode}>
+                    <td className="px-4 py-3 text-[#334155]">{field.paramCode}</td>
+                    <td className="px-4 py-3 text-[#334155]">{field.paramName}</td>
+                    <td className="px-4 py-3">
+                      <Input value={field.value} onChange={(event) => updateField(field.paramCode, event.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {props.error ? (
+          <div className="mx-5 rounded border border-[#f3d19e] bg-[#fdf6ec] px-3 py-2 text-sm text-[#a66a00]">
+            {getErrorMessage(props.error)}
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2 border-t border-[#ebeef5] px-5 py-4">
+          <Button variant="secondary" onClick={props.onClose}>
+            取消
+          </Button>
+          <Button onClick={props.onSubmit} disabled={props.savePending}>
+            {props.savePending ? '保存中...' : '保存'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RoleMenusModal(props: {
   role: AdminRoleRecord;
   menuTree: AdminMenuRecord[];
@@ -1151,6 +1907,199 @@ function RoleMenuNode(props: {
   );
 }
 
+function ToolRolesModal(props: {
+  tool: AdminToolRecord;
+  roleOptions: SelectOption[];
+  selectedRoleIds: string[];
+  savePending: boolean;
+  error: unknown;
+  onToggle: (roleId: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/40 px-4 py-6 backdrop-blur-[2px]">
+      <div className="w-full max-w-[720px] rounded border border-[#dcdfe6] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]">
+        <div className="flex items-start justify-between border-b border-[#ebeef5] px-5 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#303133]">工具角色权限</h3>
+            <p className="mt-1 text-sm text-[#909399]">{props.tool.name} 可被哪些角色或 agent 间接调用，由这里统一控制。</p>
+          </div>
+          <button
+            type="button"
+            className="rounded border border-transparent p-2 text-[#909399] transition hover:border-[#dcdfe6] hover:bg-[#f5f7fa] hover:text-[#409eff]"
+            onClick={props.onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {props.roleOptions.map((role) => {
+              const checked = props.selectedRoleIds.includes(role.value);
+              return (
+                <label key={role.value} className="flex items-start gap-3 rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => props.onToggle(role.value)}
+                    className="mt-1 h-4 w-4 rounded border-[#dcdfe6] text-[#409eff] focus:ring-[#409eff]"
+                  />
+                  <span className="text-sm text-[#334155]">{role.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {props.error ? (
+          <div className="mx-5 rounded border border-[#f3d19e] bg-[#fdf6ec] px-3 py-2 text-sm text-[#a66a00]">
+            {getErrorMessage(props.error)}
+          </div>
+        ) : null}
+
+        <div className="flex justify-end gap-2 border-t border-[#ebeef5] px-5 py-4">
+          <Button variant="secondary" onClick={props.onClose}>
+            取消
+          </Button>
+          <Button onClick={props.onSubmit} disabled={props.savePending}>
+            {props.savePending ? '保存中...' : '保存'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolSearchModal(props: {
+  values: NonNullable<ToolSearchState>;
+  roleCodeOptions: SelectOption[];
+  groupOptions: SelectOption[];
+  searchPending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onChange: (next: NonNullable<ToolSearchState>) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/40 px-4 py-6 backdrop-blur-[2px]">
+      <div className="w-full max-w-[980px] rounded border border-[#dcdfe6] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.16)]">
+        <div className="flex items-start justify-between border-b border-[#ebeef5] px-5 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#303133]">工具试搜索</h3>
+            <p className="mt-1 text-sm text-[#909399]">输入一句查询话术，验证当前工具描述和参数 schema 是否足够让检索排序命中正确工具。</p>
+          </div>
+          <button
+            type="button"
+            className="rounded border border-transparent p-2 text-[#909399] transition hover:border-[#dcdfe6] hover:bg-[#f5f7fa] hover:text-[#409eff]"
+            onClick={props.onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid gap-4 border-b border-[#ebeef5] px-5 py-5 sm:grid-cols-[2fr,1fr,1fr,auto] sm:items-end">
+          <label className="space-y-2">
+            <span className="text-xs text-[#606266]">检索 Query</span>
+            <Input
+              value={props.values.query}
+              onChange={(event) => props.onChange({ ...props.values, query: event.target.value })}
+              placeholder="例如：发邮件通知运维人员"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs text-[#606266]">角色过滤</span>
+            <select
+              value={props.values.roleCode}
+              onChange={(event) => props.onChange({ ...props.values, roleCode: event.target.value })}
+              className="h-10 w-full rounded border border-[#dcdfe6] bg-white px-3 text-sm text-[#303133] outline-none transition duration-150 focus:border-[#409eff] focus:shadow-[0_0_0_2px_rgba(64,158,255,0.12)]"
+            >
+              <option value="">全部角色</option>
+              {props.roleCodeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs text-[#606266]">分组过滤</span>
+            <select
+              value={props.values.groupName}
+              onChange={(event) => props.onChange({ ...props.values, groupName: event.target.value })}
+              className="h-10 w-full rounded border border-[#dcdfe6] bg-white px-3 text-sm text-[#303133] outline-none transition duration-150 focus:border-[#409eff] focus:shadow-[0_0_0_2px_rgba(64,158,255,0.12)]"
+            >
+              <option value="">全部分组</option>
+              {props.groupOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button onClick={props.onSubmit} disabled={props.searchPending || !props.values.query.trim()}>
+            <Search className="h-4 w-4" />
+            {props.searchPending ? '检索中...' : '开始检索'}
+          </Button>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="mb-3 flex items-center gap-2 text-sm text-[#64748b]">
+            <BarChart3 className="h-4 w-4" />
+            当前返回 {props.values.results.length} 条结果，分数越高说明语义越接近。
+          </div>
+          <div className="workspace-table max-h-[420px] overflow-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3">工具名</th>
+                  <th className="px-4 py-3">分组</th>
+                  <th className="px-4 py-3">相似度</th>
+                  <th className="px-4 py-3">角色</th>
+                  <th className="px-4 py-3">标签</th>
+                  <th className="px-4 py-3">描述</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.values.results.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-4 py-3 font-medium text-[#334155]">{item.name}</td>
+                    <td className="px-4 py-3 text-[#64748b]">{item.toolGroup || '--'}</td>
+                    <td className="px-4 py-3 text-[#334155]">{item.similarity.toFixed(4)}</td>
+                    <td className="px-4 py-3 text-[#64748b]">{item.roleNames.length ? item.roleNames.join('、') : '--'}</td>
+                    <td className="px-4 py-3 text-[#64748b]">{item.tags.length ? item.tags.join('、') : '--'}</td>
+                    <td className="max-w-[360px] px-4 py-3 text-[#64748b]">{item.description || '--'}</td>
+                  </tr>
+                ))}
+                {!props.values.results.length ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#94a3b8]">
+                      输入 query 后即可查看工具检索排序结果。
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {props.error ? (
+          <div className="mx-5 rounded border border-[#f3d19e] bg-[#fdf6ec] px-3 py-2 text-sm text-[#a66a00]">
+            {getErrorMessage(props.error)}
+          </div>
+        ) : null}
+
+        <div className="flex justify-end border-t border-[#ebeef5] px-5 py-4">
+          <Button variant="secondary" onClick={props.onClose}>
+            关闭
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DetailRow(props: { label: string; value: string }) {
   return (
     <tr>
@@ -1211,6 +2160,39 @@ function buildEmptyValues(tab: AdminTab) {
     };
   }
 
+  if (tab === 'tools') {
+    return {
+      name: '',
+      toolGroup: '',
+      version: '1.0.0',
+      status: 'ACTIVE',
+      tags: '',
+      description: '',
+      parametersSchema: ''
+    };
+  }
+
+  if (tab === 'stations') {
+    return {
+      stationId: '',
+      mn: '',
+      mnName: '',
+      lat: '',
+      lng: '',
+      st: '21'
+    };
+  }
+
+  if (tab === 'monitorData') {
+    return {
+      mn: '',
+      paramCode: '',
+      paramName: '',
+      value: '',
+      dataTime: formatDateTimeInput(new Date())
+    };
+  }
+
   return Object.fromEntries(
     fields[tab].map((field) => [field.key, field.key === 'status' ? 'ACTIVE' : ''])
   );
@@ -1253,6 +2235,42 @@ function recordToFormValues(tab: AdminTab, record: AdminRecord) {
       description: item.description ?? '',
       status: item.status ?? 'ACTIVE',
       sortOrder: String(item.sortOrder ?? '')
+    };
+  }
+
+  if (tab === 'tools') {
+    const item = record as AdminToolRecord;
+    return {
+      name: item.name,
+      toolGroup: item.toolGroup ?? '',
+      version: item.version ?? '1.0.0',
+      status: item.status ?? 'ACTIVE',
+      tags: item.tags.join(','),
+      description: item.description ?? '',
+      parametersSchema: item.parametersSchema ?? ''
+    };
+  }
+
+  if (tab === 'stations') {
+    const item = record as AdminStationRecord;
+    return {
+      stationId: item.stationId,
+      mn: item.mn,
+      mnName: item.mnName,
+      lat: String(item.lat),
+      lng: String(item.lng),
+      st: String(item.st)
+    };
+  }
+
+  if (tab === 'monitorData') {
+    const item = record as AdminMonitorDataRecord;
+    return {
+      mn: item.mn,
+      paramCode: item.paramCode,
+      paramName: item.paramName,
+      value: String(item.value),
+      dataTime: normalizeDateTimeText(item.dataTime)
     };
   }
 
@@ -1329,6 +2347,39 @@ function buildPayload(tab: AdminTab, values: Record<string, string>): AdminUpser
     };
   }
 
+  if (tab === 'tools') {
+    return {
+      name: values.name?.trim() ?? '',
+      toolGroup: values.toolGroup?.trim() ?? '',
+      version: values.version?.trim() || '1.0.0',
+      tags: splitTagText(values.tags),
+      description: values.description?.trim() ?? '',
+      parametersSchema: values.parametersSchema?.trim() ?? '',
+      enabled: !isDisabledStatus(values.status ?? 'ACTIVE')
+    };
+  }
+
+  if (tab === 'stations') {
+    return {
+      stationId: values.stationId?.trim() ?? '',
+      mn: values.mn?.trim() ?? '',
+      mnName: values.mnName?.trim() ?? '',
+      lat: parseNullableNumber(values.lat),
+      lng: parseNullableNumber(values.lng),
+      st: parseNullableNumber(values.st)
+    };
+  }
+
+  if (tab === 'monitorData') {
+    return {
+      mn: values.mn?.trim() ?? '',
+      paramCode: values.paramCode?.trim() ?? '',
+      paramName: values.paramName?.trim() ?? '',
+      value: parseNullableNumber(values.value),
+      dataTime: normalizeDateTimeText(values.dataTime)
+    };
+  }
+
   return {
     code: values.code?.trim() ?? '',
     name: values.name?.trim() ?? '',
@@ -1343,6 +2394,9 @@ function createRecord(tab: AdminTab, payload: AdminUpsertPayload) {
   if (tab === 'knowledgeBases') return createAdminKnowledgeBase(payload);
   if (tab === 'vendors') return createAdminVendor(payload);
   if (tab === 'dictionaries') return createAdminDictItem(payload);
+  if (tab === 'tools') return createAdminTool(payload);
+  if (tab === 'stations') return createAdminStation(payload);
+  if (tab === 'monitorData') return createAdminMonitorData(payload);
   return createAdminModel(payload);
 }
 
@@ -1352,6 +2406,9 @@ function updateRecord(tab: AdminTab, id: string, payload: AdminUpsertPayload) {
   if (tab === 'knowledgeBases') return updateAdminKnowledgeBase(id, payload);
   if (tab === 'vendors') return updateAdminVendor(id, payload);
   if (tab === 'dictionaries') return updateAdminDictItem(id, payload);
+  if (tab === 'tools') return updateAdminTool(id, payload);
+  if (tab === 'stations') return updateAdminStation(id, payload);
+  if (tab === 'monitorData') return updateAdminMonitorData(id, payload);
   return updateAdminModel(id, payload);
 }
 
@@ -1361,11 +2418,23 @@ function deleteRecord(tab: AdminTab, id: string) {
   if (tab === 'knowledgeBases') return deleteAdminKnowledgeBase(id);
   if (tab === 'vendors') return deleteAdminVendor(id);
   if (tab === 'dictionaries') return deleteAdminDictItem(id);
+  if (tab === 'tools') return deleteAdminTool(id);
+  if (tab === 'stations') return deleteAdminStation(id);
+  if (tab === 'monitorData') return deleteAdminMonitorData(id);
   return deleteAdminModel(id);
 }
 
 function invalidateAdmin(queryClient: ReturnType<typeof useQueryClient>, tab: AdminTab) {
-  const key = tab === 'knowledgeBases' ? 'knowledge-bases' : tab === 'dictionaries' ? 'dict-items' : tab;
+  const key =
+    tab === 'knowledgeBases'
+      ? 'knowledge-bases'
+      : tab === 'dictionaries'
+        ? 'dict-items'
+        : tab === 'tools'
+          ? 'tools'
+        : tab === 'monitorData'
+          ? 'monitor-data'
+          : tab;
   return queryClient.invalidateQueries({ queryKey: ['admin-management', key] });
 }
 
@@ -1489,6 +2558,49 @@ function buildDetailRows(tab: AdminTab, record: AdminRecord, flattenedMenus: Adm
     ];
   }
 
+  if (tab === 'tools') {
+    const item = record as AdminToolRecord;
+    return [
+      { label: '工具名', value: item.name },
+      { label: '所属分组', value: item.toolGroup || '--' },
+      { label: '版本号', value: item.version || '--' },
+      { label: '状态', value: item.status },
+      { label: '向量状态', value: item.embeddingStatus || '--' },
+      { label: '失败原因', value: item.embeddingError || '--' },
+      { label: '权限角色', value: item.roleNames.length ? item.roleNames.join('、') : '未绑定' },
+      { label: '标签', value: item.tags.length ? item.tags.join('、') : '--' },
+      { label: '命中次数', value: String(item.hitCount) },
+      { label: '调用次数', value: String(item.callCount) },
+      { label: '成功次数', value: String(item.successCount) },
+      { label: '成功率', value: formatPercent(item.successRate) },
+      { label: '描述', value: item.description || '--' },
+      { label: '参数 Schema', value: item.parametersSchema || '--' }
+    ];
+  }
+
+  if (tab === 'stations') {
+    const item = record as AdminStationRecord;
+    return [
+      { label: '点位名称', value: item.mnName },
+      { label: '站点编码', value: item.stationId },
+      { label: 'MN 编号', value: item.mn },
+      { label: '纬度', value: String(item.lat) },
+      { label: '经度', value: String(item.lng) },
+      { label: '站点类型', value: String(item.st) }
+    ];
+  }
+
+  if (tab === 'monitorData') {
+    const item = record as AdminMonitorDataRecord;
+    return [
+      { label: 'MN 编号', value: item.mn },
+      { label: '参数编码', value: item.paramCode },
+      { label: '参数名称', value: item.paramName },
+      { label: '监测值', value: String(item.value) },
+      { label: '监测时间', value: item.dataTime }
+    ];
+  }
+
   const item = record as AdminModelRecord;
   return [
     { label: '模型名称', value: item.name },
@@ -1512,6 +2624,28 @@ function describeMenuKind(menu: AdminMenuRecord) {
   return menu.children.length > 0 || !menu.component ? '目录' : '菜单';
 }
 
+function resolveEmbeddingTone(status: string) {
+  const normalized = status.trim().toUpperCase();
+  if (normalized === 'READY') {
+    return 'good' as const;
+  }
+  if (normalized === 'FAILED') {
+    return 'warn' as const;
+  }
+  return 'neutral' as const;
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function splitTagText(value: string) {
+  return value
+    .split(/[，,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function buildDictOptions(items: AdminDictionaryRecord[], dictType: string): SelectOption[] {
   return items
     .filter((item) => item.dictType === dictType && item.status === 'ACTIVE')
@@ -1522,6 +2656,114 @@ function buildDictOptions(items: AdminDictionaryRecord[], dictType: string): Sel
     }));
 }
 
+function buildMonitorGroupModalState(record: MonitorDataGroupRow): MonitorDataGroupModalState {
+  return {
+    id: record.id,
+    mn: record.mn,
+    mnName: record.mnName,
+    dataTime: normalizeDateTimeText(record.dataTime),
+    fields: MONITOR_PARAM_META.map((item) => ({
+      paramCode: item.code,
+      paramName: item.name,
+      recordId: record.detailIds[item.code],
+      value: readMonitorGroupValue(record, item.code)
+    }))
+  };
+}
+
+function groupMonitorDataRows(items: AdminMonitorDataRecord[], stationNameByMn: Map<string, string>): MonitorDataGroupRow[] {
+  const grouped = new Map<string, MonitorDataGroupRow>();
+
+  for (const item of items) {
+    const key = `${item.mn}__${item.dataTime}`;
+    const current =
+      grouped.get(key) ??
+      {
+        id: key,
+        mn: item.mn,
+        mnName: stationNameByMn.get(item.mn) ?? '--',
+        dataTime: item.dataTime,
+        detailIds: {},
+        totalPhosphorus: '--',
+        totalNitrogen: '--',
+        ammoniaNitrogen: '--',
+        codmn: '--',
+        ph: '--',
+        waterLevel: '--',
+        flow: '--',
+        velocity: '--'
+      };
+
+    switch (item.paramCode.trim().toUpperCase()) {
+      case 'TP':
+        current.detailIds.TP = item.id;
+        current.totalPhosphorus = formatMonitorValue(item.value);
+        break;
+      case 'TN':
+        current.detailIds.TN = item.id;
+        current.totalNitrogen = formatMonitorValue(item.value);
+        break;
+      case 'NH3N':
+        current.detailIds.NH3N = item.id;
+        current.ammoniaNitrogen = formatMonitorValue(item.value);
+        break;
+      case 'CODMN':
+        current.detailIds.CODMN = item.id;
+        current.codmn = formatMonitorValue(item.value);
+        break;
+      case 'PH':
+        current.detailIds.PH = item.id;
+        current.ph = formatMonitorValue(item.value);
+        break;
+      case 'WL':
+        current.detailIds.WL = item.id;
+        current.waterLevel = formatMonitorValue(item.value);
+        break;
+      case 'Q':
+        current.detailIds.Q = item.id;
+        current.flow = formatMonitorValue(item.value);
+        break;
+      case 'VS':
+        current.detailIds.VS = item.id;
+        current.velocity = formatMonitorValue(item.value);
+        break;
+      default:
+        break;
+    }
+
+    grouped.set(key, current);
+  }
+
+  return Array.from(grouped.values()).sort((left, right) => {
+    const timeDiff = new Date(right.dataTime).getTime() - new Date(left.dataTime).getTime();
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+    return left.mn.localeCompare(right.mn, 'zh-CN');
+  });
+}
+
+function readMonitorGroupValue(record: MonitorDataGroupRow, code: MonitorParamCode) {
+  switch (code) {
+    case 'TP':
+      return record.totalPhosphorus === '--' ? '' : record.totalPhosphorus;
+    case 'TN':
+      return record.totalNitrogen === '--' ? '' : record.totalNitrogen;
+    case 'NH3N':
+      return record.ammoniaNitrogen === '--' ? '' : record.ammoniaNitrogen;
+    case 'CODMN':
+      return record.codmn === '--' ? '' : record.codmn;
+    case 'PH':
+      return record.ph === '--' ? '' : record.ph;
+    case 'WL':
+      return record.waterLevel === '--' ? '' : record.waterLevel;
+    case 'Q':
+      return record.flow === '--' ? '' : record.flow;
+    case 'VS':
+      return record.velocity === '--' ? '' : record.velocity;
+  }
+}
+
 function buildFieldOptions(
   tab: AdminTab,
   options: {
@@ -1529,8 +2771,12 @@ function buildFieldOptions(
     modelTypeOptions: SelectOption[];
     vendorOptions: SelectOption[];
     dictTypeOptions: SelectOption[];
+    stationMnOptions: SelectOption[];
   }
 ): Record<string, SelectOption[]> {
+  if (tab === 'roles') {
+    return { status: options.statusOptions };
+  }
   if (tab === 'vendors') {
     return { status: options.statusOptions };
   }
@@ -1543,6 +2789,17 @@ function buildFieldOptions(
   }
   if (tab === 'dictionaries') {
     return { status: options.statusOptions };
+  }
+  if (tab === 'tools') {
+    return { status: options.statusOptions };
+  }
+  if (tab === 'stations') {
+    return {};
+  }
+  if (tab === 'monitorData') {
+    return {
+      mn: options.stationMnOptions
+    };
   }
   return {};
 }
@@ -1562,6 +2819,32 @@ function parseNullableNumber(value?: string | null) {
   }
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatMonitorValue(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') {
+    return '--';
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? String(parsed) : '--';
+}
+
+function formatDateTimeInput(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hour = String(value.getHours()).padStart(2, '0');
+  const minute = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function normalizeDateTimeText(value?: string | null) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const normalized = trimmed.replace(' ', 'T');
+  return normalized.length === 16 ? `${normalized}:00` : normalized;
 }
 
 function isDisabledStatus(value: string) {
