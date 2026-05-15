@@ -167,6 +167,27 @@ CREATE TABLE IF NOT EXISTS async_tasks (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS agent_tasks (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    instruction TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    current_step VARCHAR(64),
+    output TEXT,
+    error_msg TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agent_task_logs (
+    id BIGSERIAL PRIMARY KEY,
+    task_id BIGINT NOT NULL,
+    step VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    line TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_kb_id ON documents(kb_id);
 CREATE INDEX IF NOT EXISTS idx_document_chunks_doc_id ON document_chunks(doc_id);
@@ -178,3 +199,6 @@ CREATE INDEX IF NOT EXISTS idx_sys_role_menus_menu ON sys_role_menus(menu_id);
 CREATE INDEX IF NOT EXISTS idx_ai_models_vendor ON ai_models(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_sys_dict_items_type ON sys_dict_items(dict_type);
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_user_id ON agent_tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_agent_task_logs_task_id ON agent_task_logs(task_id);
