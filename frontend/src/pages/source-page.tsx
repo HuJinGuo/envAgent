@@ -30,7 +30,7 @@ export function SourcePage(props: {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_260px]">
-      <Panel title="企业列表" description="按风险等级、许可证和在线监测状态组合成执法入口。">
+      <Panel title="企业列表">
         <div className="workspace-table">
           <table className="w-full text-left text-sm">
             <thead>
@@ -64,7 +64,7 @@ export function SourcePage(props: {
         </div>
       </Panel>
 
-      <Panel title={selectedEnterprise.name} description="将许可、排口、监测和合规备注拆成可扫描的档案中心。">
+      <Panel title={selectedEnterprise.name}>
         <div className="workspace-table">
           <table className="w-full text-left text-sm">
             <tbody>
@@ -90,7 +90,7 @@ export function SourcePage(props: {
         </div>
       </Panel>
 
-      <Panel title="合规备注" description="右侧单列更适合执法场景快速比对。">
+      <Panel title="合规备注">
         <div className="overflow-hidden rounded border border-[#e2e8f0] bg-white">
           {selectedEnterprise.complianceNotes.map((item: string, index: number) => (
             <div key={item} className={cn('px-4 py-3 text-sm leading-6 text-[#475569]', index > 0 && 'border-t border-[#edf2f7]')}>

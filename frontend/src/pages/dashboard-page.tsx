@@ -42,7 +42,7 @@ export function DashboardPage(props: {
 
   return (
     <>
-      <Panel title="运行概览" description="保留核心指标，但收成后台工作台常见的四列概览带，减少独立卡片数量。">
+      <Panel title="运行概览">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="今日 AI 问答"
@@ -74,7 +74,6 @@ export function DashboardPage(props: {
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Panel
           title="最近问答记录"
-          description="保留最近问答列表作为首页主视区，弱化展示型装饰。"
           action={
             <Button variant="ghost" size="sm" onClick={props.onRefresh}>
               <RefreshCw className="h-4 w-4" />
@@ -104,7 +103,7 @@ export function DashboardPage(props: {
           </div>
         </Panel>
 
-        <Panel title="知识库使用分布" description="以条形占比展示热点知识域，保持后台页的一眼可读。">
+        <Panel title="知识库使用分布">
           <div className="space-y-4">
             {props.dashboard.knowledgeUsage.map((item) => (
               <BarRow key={item.label} label={item.label} value={item.percent} color={item.color} />
@@ -114,7 +113,7 @@ export function DashboardPage(props: {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel title="当前交付物" description="交付状态收成清单行，不再拆很多独立小卡片。">
+        <Panel title="当前交付物">
           <div className="space-y-2">
             {props.dashboard.taskStatus.map((item) => (
               <div key={item.id} className="rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
@@ -130,7 +129,7 @@ export function DashboardPage(props: {
           </div>
         </Panel>
 
-        <Panel title="系统健康摘录" description="接口状态与模型配置直接压缩为信息块。">
+        <Panel title="系统健康摘录">
           {props.healthLoading ? (
             <PageSkeleton blocks={3} />
           ) : props.healthError ? (

@@ -48,7 +48,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '仪表盘',
       title: '环境监管工作台概览',
-      description: '汇总问答、知识库、Agent 与系统状态，先承接 MVP 与二期功能的全局入口。',
+      description: '',
       icon: Gauge,
       hint: '总览'
     },
@@ -62,7 +62,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '智能问答',
       title: 'RAG 问答主工作区',
-      description: '保留会话、知识库范围、引用来源和输入面板，按文档要求为后续 SSE 对话预留结构。',
+      description: '',
       icon: MessageSquareText,
       hint: 'RAG 问答'
     },
@@ -76,7 +76,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '知识库',
       title: '知识库管理与上传',
-      description: '围绕文档上传、切片、向量化与状态跟踪组织页面，支撑知识入库与检索管理。',
+      description: '',
       icon: Database,
       hint: '上传与入库'
     },
@@ -90,7 +90,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '污染源档案',
       title: '企业档案与监测风险',
-      description: '把企业许可、在线监测、风险等级和合规备注编排成执法与分析共用的档案页。',
+      description: '',
       icon: Building2,
       hint: '企业档案'
     },
@@ -104,7 +104,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: 'Agent 任务',
       title: 'Agent 任务工作台',
-      description: '聚焦任务发起、执行流、工具可用性和输出预览，贴合三期规划中的工具调用框架。',
+      description: '',
       icon: Bot,
       hint: '任务流'
     },
@@ -118,7 +118,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '系统监控',
       title: '模型调用与服务监控',
-      description: '围绕 Token、调用记录、可用性和响应时延组织，后续可直接替换为真实观测接口。',
+      description: '',
       icon: BarChart3,
       hint: 'Token 与日志'
     },
@@ -132,7 +132,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '用户管理',
       title: '用户与权限矩阵',
-      description: '以角色权限为主线呈现内部使用者结构，服务管理层对权限边界的确认。',
+      description: '',
       icon: Users,
       hint: 'RBAC'
     },
@@ -146,7 +146,7 @@ export const workspaceRouteRegistry: Record<WorkspaceRouteKey, WorkspaceRouteDef
     meta: {
       label: '基础管理',
       title: '基础管理配置中心',
-      description: '集中维护角色、菜单、知识库、厂商和模型配置，为后端可配置导航与权限体系预留接口。',
+      description: '',
       icon: Settings,
       hint: '配置中心'
     },

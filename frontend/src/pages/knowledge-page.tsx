@@ -243,10 +243,7 @@ export function KnowledgePage(props: { data?: KnowledgeWorkspace; isLoading: boo
         ))}
       </div>
 
-      <Panel
-        title="知识内容工作台"
-        description="这里负责选择知识库、上传文档、跟踪入库状态以及查看切片与向量结果。知识库本身的新增和维护放在基础管理里。"
-      >
+      <Panel title="知识内容工作台">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid gap-3 md:grid-cols-[220px_160px_minmax(0,1fr)] lg:min-w-0 lg:flex-1">
             <label className="space-y-1.5">
@@ -563,7 +560,7 @@ function DocumentDetailDrawer(props: {
 
 function DocumentOverview(props: { document: KnowledgeDocument | null; chunks: KnowledgeDocumentChunk[] }) {
   if (!props.document) {
-    return <EmptyState icon={FileStack} title="未找到文档信息" description="当前文档详情不存在或已被删除。" />;
+    return <EmptyState icon={FileStack} title="未找到文档信息" />;
   }
 
   const sampleChunk = props.chunks[0] ?? null;
@@ -607,7 +604,6 @@ function DocumentChunksPanel(props: {
       <EmptyState
         icon={FileStack}
         title="暂无切片结果"
-        description="文档仍在解析中，或当前文档尚未生成可展示的切片。"
       />
     );
   }
@@ -743,7 +739,7 @@ function DocumentChunksPanel(props: {
             </div>
           </div>
         ) : (
-          <EmptyState icon={FileStack} title="未找到匹配切片" description="可以调整筛选关键词，或从左侧重新选择切片。" />
+          <EmptyState icon={FileStack} title="未找到匹配切片" />
         )}
       </div>
     </div>
